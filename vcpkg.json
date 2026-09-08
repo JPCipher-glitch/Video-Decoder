@@ -1,0 +1,13 @@
+{
+  "dependencies": [
+    {
+      "name": "ffmpeg",
+      "features": [
+        "avcodec",
+        "avformat",
+        "swscale",
+        "zlib"
+      ]
+    }
+  ]
+}

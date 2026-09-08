@@ -1,0 +1,7 @@
+# CMake Cache
+build
+out/
+
+# IDE
+.vscode
+.vs
