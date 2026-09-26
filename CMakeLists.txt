@@ -40,5 +40,6 @@
 # Include the FFMPEG lib's directories
     target_link_directories(${PROJECT_NAME} PRIVATE ${FFMPEG_LIBRARY_DIRS})
 
-# Include the FFMPEG libs
+# Include the FFMPEG & Winsock libs
     target_link_libraries(${PROJECT_NAME} PRIVATE ${FFMPEG_LIBRARIES})
+    target_link_libraries(${PROJECT_NAME} PRIVATE Ws2_32)

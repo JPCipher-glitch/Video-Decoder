@@ -1,14 +1,15 @@
 #ifndef ENGINE_HPP
 #define ENGINE_HPP
 
-#include "video_manager.hpp"
+#include "video/video_manager.hpp"
+#include "command.hpp"
 #include "lifetime.hpp"
 
 class Engine
 {
 private:
 	VideoManager videoManager;
-	// Command
+	Command command;
 	Lifetime lifetime;
 	// Debug
 public:
