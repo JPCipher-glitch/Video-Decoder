@@ -10,6 +10,37 @@
 # Resources Files
     file(COPY ${CMAKE_SOURCE_DIR}/resources DESTINATION ${CMAKE_BINARY_DIR})
 
+# Install CPM
+    set(CPM_USE_LOCAL_PACKAGES ON)
+
+    set(CPM_DOWNLOAD_VERSION 0.42.0)
+    set(CPM_HASH_SUM "2020b4fc42dba44817983e06342e682ecfc3d2f484a581f11cc5731fbe4dce8a")
+
+    if(CPM_SOURCE_CACHE)
+        set(CPM_DOWNLOAD_LOCATION "${CPM_SOURCE_CACHE}/cpm/CPM_${CPM_DOWNLOAD_VERSION}.cmake")
+    elseif(DEFINED ENV{CPM_SOURCE_CACHE})
+        set(CPM_DOWNLOAD_LOCATION "$ENV{CPM_SOURCE_CACHE}/cpm/CPM_${CPM_DOWNLOAD_VERSION}.cmake")
+    else()
+        set(CPM_DOWNLOAD_LOCATION "${CMAKE_BINARY_DIR}/cmake/CPM_${CPM_DOWNLOAD_VERSION}.cmake")
+    endif()
+
+    # Expand relative path. This is important if the provided path contains a tilde (~)
+        get_filename_component(CPM_DOWNLOAD_LOCATION ${CPM_DOWNLOAD_LOCATION} ABSOLUTE)
+
+    file(DOWNLOAD
+        https://github.com/cpm-cmake/CPM.cmake/releases/download/v${CPM_DOWNLOAD_VERSION}/CPM.cmake
+        ${CPM_DOWNLOAD_LOCATION} EXPECTED_HASH SHA256=${CPM_HASH_SUM}
+    )
+
+    include(${CPM_DOWNLOAD_LOCATION})
+
+# Boost-asio repository
+    CPMAddPackage(
+        NAME asiocmake
+        GIT_REPOSITORY "https://github.com/OlivierLDff/asio.cmake"
+        GIT_TAG "main"
+    )
+
 # FFMPEG package
     find_package(FFMPEG REQUIRED)
 
@@ -40,6 +71,7 @@
 # Include the FFMPEG lib's directories
     target_link_directories(${PROJECT_NAME} PRIVATE ${FFMPEG_LIBRARY_DIRS})
 
-# Include the FFMPEG & Winsock libs
+# Include the FFMPEG, Winsock, Asio libs
     target_link_libraries(${PROJECT_NAME} PRIVATE ${FFMPEG_LIBRARIES})
     target_link_libraries(${PROJECT_NAME} PRIVATE Ws2_32)
+    target_link_libraries(${PROJECT_NAME} PUBLIC asio::asio)

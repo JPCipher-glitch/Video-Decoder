@@ -54,7 +54,7 @@ void Command::handlerTask()
 {
     while (running) // Execute while the server is still existing
     {
-        //std::shared_lock lock(mutex); // Lock the readers to prevent of using the sockets when adding another one
+        std::shared_lock lock(mutex); // Lock the readers to prevent of using the sockets when adding another one
 
         // Get the packets from each sockets
         for (auto client = clientList.begin(); client != clientList.end();)
