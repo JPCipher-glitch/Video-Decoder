@@ -3,7 +3,12 @@
 
 Engine::Engine() : videoManager(lifetime)
 {
-	command.attach(&videoManager);
+	command = std::make_shared<Command>();
+	command->accept();
+	command->run();
+	command->attach(&videoManager);
+
+	debug.run();
 }
 
 Engine::~Engine()
@@ -16,7 +21,7 @@ void Engine::run()
 	while (lifetime.isAlive())
 	{
 		videoManager.update();
-		command.update();
+		command->update();
 		lifetime.update();
 	}
 }

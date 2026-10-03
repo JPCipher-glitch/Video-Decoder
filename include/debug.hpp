@@ -1,12 +1,8 @@
 #ifndef DEBUG_HPP
 #define DEBUG_HPP
 
+#include "asio_utils.hpp"
 #include "serializer/protocol.hpp"
-
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#define NOMINMAX
-#include <windows.h>
 
 #include <functional>
 #include <thread>
@@ -18,8 +14,9 @@ class Serializer;
 class Debug : public IProtocol
 {
 private:
-	WSADATA data;
-	SOCKET server;
+	IoContext ctx;
+	TcpSocket socket;
+	Resolver resolver;
 
 	std::string command;
 
@@ -35,6 +32,8 @@ private:
 public:
 	Debug();
 	~Debug();
+
+	void run();
 };
 
 #endif

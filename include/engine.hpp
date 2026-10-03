@@ -10,7 +10,7 @@ class Engine
 {
 private:
 	VideoManager videoManager;
-	Command command;
+	std::shared_ptr<Command> command;
 	Lifetime lifetime;
 	Debug debug;
 public:

@@ -4,6 +4,100 @@
 
 #include <iostream>
 
+#pragma region READ
+ClientStuff::ClientStuff(TcpSocket&& socket) : socket(std::move(socket)) {}
+
+void ClientStuff::read(std::weak_ptr<Command> c)
+{
+    auto self{ shared_from_this() }; // Make sure the client is not unvalid when updating the async task
+    socket.async_read_some(asio::buffer(buffer), [this, self, c](ErrorCode error, size_t length)
+        {
+            std::shared_ptr<Command> command = c.lock();
+            if (!command) return;
+            if (!command->isRunning()) return;
+
+            // Check when the client receive a packet
+            if (!error && length > 0)
+            {
+                // Fill the stream byte with the buffer received
+                byte_stream stream(buffer.begin(), buffer.begin() + length);
+
+                if (command->isRunning())
+                {
+                    // Create the packet and send it to the video manager
+                    std::unique_ptr<IPacket> packet = command->receivePacket(stream);
+                    command->notify(packet.get());
+                }
+
+                read(command);
+            }
+            else if (error) // Check if an error occured
+            {
+                if (error != asio::error::eof)
+                    std::cout << "ERROR: " << error.message() << std::endl;
+                else
+                    toRemove = true;
+            }
+        });
+}
+#pragma endregion
+
+#pragma region CONSTRUCTOR
+Command::Command() : server{ ctx }, acceptor{ ctx, TcpEndpoint(asio::ip::tcp::v4(), SERVER_PORT) }
+{
+    // Fill the map
+    callMap[COMMAND_TYPE::LOAD] = [this](Serializer& s) { return loadVideo(s); };
+    std::cout << "Server is listening...\n";
+}
+#pragma endregion
+
+#pragma region DESTRUCTOR
+Command::~Command()
+{
+    running = false;
+    acceptor.close();
+    ctx.stop();
+}
+#pragma endregion
+
+#pragma region ACCEPT
+void Command::accept()
+{
+    auto self = shared_from_this();
+    acceptor.async_accept([this, self](ErrorCode error, TcpSocket socket)
+        {
+            if (!running) return;
+
+            // Add the new client if there is no error during the process
+            if (!error)
+            {
+                // Create the client
+                std::shared_ptr<ClientStuff> client = std::make_shared<ClientStuff>(std::move(socket));
+                client->read(self);
+
+                // Add the client to the list
+                {
+                    std::unique_lock lock(mutex); // Lock the readers to prevent of using the sockets when adding another one
+                    clientList.push_back(std::move(client));
+                }
+            }
+
+            // Retry if there is other clients
+            accept();
+        });
+}
+#pragma endregion
+
+#pragma region RUN
+void Command::run()
+{
+    task = std::jthread([this]
+    {
+        ctx.run(); // Run the task launched with the context
+    });
+}
+#pragma endregion
+
 #pragma region COMMANDS
 std::unique_ptr<IPacket> Command::loadVideo(Serializer& s)
 {
@@ -41,134 +135,6 @@ std::unique_ptr<IPacket> Command::receivePacket(const byte_stream& stream)
 }
 #pragma endregion
 
-#pragma region CONSTRUCTOR
-Command::Command()
-{
-    // Fill the map
-    callMap[COMMAND_TYPE::LOAD] = [this](Serializer& s) { return loadVideo(s); };
-
-    WSAStartup(MAKEWORD(2, 2), &stuff.data); // Initialize Network Stack with a stable version of Winsock
-
-    stuff.server = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP); // Create the socket of the server : AF_INET for IPV4, SOCK_STREAM & IPPROTO_TCP to use the TCP protocol
-    u_long mode = 1;
-    ioctlsocket(stuff.server, FIONBIO, &mode); // Set the socket to non-blocking
-
-    sockaddr_in addr{}; // Create the Contact Form to 127.0.0.1 in the port 9666
-    addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(9666);
-
-    bind(stuff.server, (sockaddr*)&addr, sizeof(addr)); // Assign the Network Adress of the server socket
-    listen(stuff.server, 5); // Receive connection requests from others clients : 1 only is allowed
-
-    std::cout << "Server is listening...\n";
-
-    // Create the task to manage the packet transfer
-    task = std::async(std::launch::async, [this]
-    {
-        handlerTask();
-    });
-}
-#pragma endregion
-
-#pragma region DESTRUCTOR
-Command::~Command()
-{
-    running = false;
-
-    // Wait the task to finish
-    if (task.valid())
-        task.wait();
-
-    // Destroy the server & the sockets when the task finishes
-    for (auto& client : clientList)
-    {
-        closesocket(client->socket);
-    }
-    closesocket(stuff.server);
-    WSACleanup();
-}
-#pragma endregion
-
-#pragma region HANDLER
-void Command::handlerTask()
-{
-    while (running) // Execute while the server is still existing
-    {
-        std::shared_lock lock(mutex); // Lock the readers to prevent of using the sockets when adding another one
-
-        // Get the packets from each sockets
-        for (auto client = clientList.begin(); client != clientList.end();)
-        {
-            // Create the packet to receive
-            char buffer[1024]; // EDIT: this will get out soon
-
-            // Take the sended bytes for the packet & check if the socket is still connected
-            int result = recv((*client)->socket, buffer, sizeof(buffer), 0);
-            if (result > 0) // The client socket is still connected
-            {
-                byte_stream stream(buffer, buffer + result);
-
-                std::unique_ptr<IPacket> packet = receivePacket(stream);
-                notify(packet.get());
-                client++;
-            }
-            else if (result == 0) // The client socket is cleanly deleted
-            {
-                {
-                    std::unique_lock lock(mutex);
-                    closesocket((*client)->socket);
-                    client = clientList.erase(client);
-                }
-
-                std::cout << "Client disconnected.\n";
-            }
-            else if (result == SOCKET_ERROR) // An error was ocurred in the socket
-            {
-                int error = WSAGetLastError();
-                if (error == WSAEWOULDBLOCK)
-                {
-                    client++;
-                }
-                else
-                {
-                    {
-                        std::unique_lock lock(mutex);
-                        closesocket((*client)->socket);
-                        client = clientList.erase(client);
-                    }
-
-                    std::cout << "ERROR: Client suddenly disconnected.\n";
-                }
-            }
-        }
-    }
-}
-#pragma endregion
-
-#pragma region UPDATE
-void Command::update()
-{
-    SOCKET socket = accept(stuff.server, nullptr, nullptr); // Accept client request if received
-    if (socket != INVALID_SOCKET) // Check if request received
-    {
-        // Set the socket to non-blocking
-        u_long mode = 1;
-        ioctlsocket(socket, FIONBIO, &mode);
-
-        // Create the client
-        std::unique_ptr<ClientStuff> client = std::make_unique<ClientStuff>();
-        client->socket = socket;
-
-        // Add the client to the list
-        {
-            std::unique_lock lock(mutex); // Lock the readers to prevent of using the sockets when adding another one
-            clientList.push_back(std::move(client));
-        }
-    }
-}
-#pragma endregion
-
 #pragma region OBSERVER
 void Command::attach(IObserver* obs)
 {
@@ -183,4 +149,22 @@ void Command::notify(IPacket* packet)
     }
 }
 #pragma endregion
+
+#pragma region UPDATE
+void Command::update()
+{
+    // Remove the clients when they are deconnected
+    std::unique_lock lock(mutex);
+    for (auto client = clientList.begin(); client != clientList.end();)
+    {
+        if ((*client)->toRemove)
+        {
+            client = clientList.erase(client); 
+            continue;
+        }
+        client++;
+    }
+}
+#pragma endregion
+
 
