@@ -1,5 +1,6 @@
 ﻿#include "debug.hpp"
 
+#include "video/video_packets.hpp"
 #include "serializer/serializer.hpp"
 
 #include <conio.h>
@@ -7,10 +8,37 @@
 #include <sstream>
 
 #pragma region COMMANDS
+void Debug::loadVideo(Serializer& s)
+{
+    PacketLoad packet{};
+    packet.name = "Bart at the Blarney Stone";
+    packet.path = "C:/Users/Tailscoco/Downloads/Video/placeholder";
+
+    s.write(COMMAND_TYPE::LOAD);
+
+    s.writeString(packet.name);
+    s.writeString(packet.path);
+    s.writeString(packet.frameFormat);
+    s.writeString(packet.audioFormat);
+    s.writeString(packet.videoFormat);
+
+    s.write(packet.width);
+    s.write(packet.height);
+    s.write(packet.fps);
+}
+
 void Debug::sendPacket(const std::string& name)
 {
-    std::cout << "VIDEO_LOADED\n";
-    //send(server, msg.c_str(), msg.length(), 0);
+    // Get the command name
+    command = name;
+
+    // Serialize the data content
+    Serializer s{};
+    callMap[command](s);
+
+    // Send the new stream data to the server
+    byte_stream stream = s.returnStream();
+    send(server, reinterpret_cast<const char*>(stream.data()), stream.size() * sizeof(byte), 0);
 }
 #pragma endregion
 
@@ -20,7 +48,7 @@ void Debug::sendPacket(const std::string& name)
 Debug::Debug()
 {
     // Fill the map
-    callMap["LOAD"] = [this]() { sendPacket(""); };
+    callMap["LOAD"] = [this](Serializer& s) { loadVideo(s); };
 
     WSAStartup(MAKEWORD(2, 2), &data); // Initialize Network Stack with a stable version of Winsock
 
@@ -80,22 +108,10 @@ void Debug::handlerTask(std::stop_token stopToken)
 
             // Check if the command is valid
             if (callMap.contains(msg))
-                callMap[msg]();
+                sendPacket(msg);
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
-}
-#pragma endregion
-
-#pragma region SERIALIZE
-byte_stream Debug::serialize() const
-{
-    Serializer s{};
-    /*s.write(GetType());
-    s.write(grid_width);
-    s.write(grid_height);*/
-
-    return s.returnStream();
 }
 #pragma endregion
 

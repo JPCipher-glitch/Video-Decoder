@@ -1,11 +1,52 @@
 ﻿#include "command.hpp"
 #include "video/video_packets.hpp"
+#include "serializer/serializer.hpp"
 
 #include <iostream>
+
+#pragma region COMMANDS
+std::unique_ptr<IPacket> Command::loadVideo(Serializer& s)
+{
+    // Make the abstract packet and set it to the wanted packet
+    std::unique_ptr<IPacket> packet = std::make_unique<PacketLoad>();
+    PacketLoad* p = dynamic_cast<PacketLoad*>(packet.get());
+
+    // Add the type of the packet
+    p->type = COMMAND_TYPE::LOAD;
+
+    // Read the string buffer
+    p->name = s.readString();
+    p->path = s.readString();
+    p->frameFormat = s.readString();
+    p->audioFormat = s.readString();
+    p->videoFormat = s.readString();
+
+    // Read the numerical data
+    p->width = s.read<uint16_t>();
+    p->height = s.read<uint16_t>();
+    p->fps = s.read<float>();
+
+    // Return the packet
+    return std::move(packet);
+}
+
+std::unique_ptr<IPacket> Command::receivePacket(const byte_stream& stream)
+{
+    // Deserialize the first argument "TYPE" to determine with what type of packet we want to get
+    Serializer s{ stream };
+    COMMAND_TYPE type = s.read<COMMAND_TYPE>();
+
+    // Return the packet
+    return callMap[type](s);
+}
+#pragma endregion
 
 #pragma region CONSTRUCTOR
 Command::Command()
 {
+    // Fill the map
+    callMap[COMMAND_TYPE::LOAD] = [this](Serializer& s) { return loadVideo(s); };
+
     WSAStartup(MAKEWORD(2, 2), &stuff.data); // Initialize Network Stack with a stable version of Winsock
 
     stuff.server = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP); // Create the socket of the server : AF_INET for IPV4, SOCK_STREAM & IPPROTO_TCP to use the TCP protocol
@@ -60,14 +101,16 @@ void Command::handlerTask()
         for (auto client = clientList.begin(); client != clientList.end();)
         {
             // Create the packet to receive
-            IPacket packet;
+            char buffer[1024]; // EDIT: this will get out soon
 
             // Take the sended bytes for the packet & check if the socket is still connected
-            int result = recv((*client)->socket, reinterpret_cast<char*>(&packet), sizeof(packet), 0);
+            int result = recv((*client)->socket, buffer, sizeof(buffer), 0);
             if (result > 0) // The client socket is still connected
             {
-                // ...
-                notify(&packet);
+                byte_stream stream(buffer, buffer + result);
+
+                std::unique_ptr<IPacket> packet = receivePacket(stream);
+                notify(packet.get());
                 client++;
             }
             else if (result == 0) // The client socket is cleanly deleted
@@ -140,3 +183,4 @@ void Command::notify(IPacket* packet)
     }
 }
 #pragma endregion
+

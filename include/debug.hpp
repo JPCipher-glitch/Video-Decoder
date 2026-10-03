@@ -13,15 +13,20 @@
 #include <mutex>
 #include <unordered_map>
 
+class Serializer;
+
 class Debug : public IProtocol
 {
 private:
 	WSADATA data;
 	SOCKET server;
 
+	std::string command;
+
+	void loadVideo(Serializer& s);
 	void sendPacket(const std::string& name);
 
-	std::unordered_map<std::string, std::function<void()>> callMap;
+	std::unordered_map<std::string, std::function<void(Serializer&)>> callMap;
 
 	std::mutex mutex;
 	std::jthread task;
@@ -30,9 +35,6 @@ private:
 public:
 	Debug();
 	~Debug();
-
-	byte_stream serialize() const override;
-	void deserialize(const byte_stream& data) override {};
 };
 
 #endif

@@ -2,6 +2,7 @@
 #define COMMAND_HPP
 
 #include "serializer/protocol.hpp"
+#include "serializer/command_type.hpp"
 #include "observer.hpp"
 
 #include <winsock2.h>
@@ -24,17 +25,24 @@ struct NetworkStuff
 	SOCKET server;
 };
 
+class Serializer;
+
 class Command : public IProtocol
 {
 private:
 	NetworkStuff stuff;
 	std::vector<IObserver*> obsList;
 
+	std::unordered_map<COMMAND_TYPE, std::function<std::unique_ptr<IPacket>(Serializer&)>> callMap;
+
 	std::vector<std::unique_ptr<ClientStuff>> clientList;
 
 	std::shared_mutex mutex;
 	std::future<void> task;
 	std::atomic_bool running = true;
+
+	std::unique_ptr<IPacket> loadVideo(Serializer& s);
+	std::unique_ptr<IPacket> receivePacket(const byte_stream& stream);
 
 	void handlerTask();
 public:
@@ -45,9 +53,6 @@ public:
 	void notify(IPacket* packet);
 
 	void update();
-
-	byte_stream serialize() const override { return {}; };
-	void deserialize(const byte_stream& data) override {};
 };
 
 #endif
