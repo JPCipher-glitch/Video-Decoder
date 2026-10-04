@@ -9,6 +9,7 @@
 #include <mutex>
 #include <unordered_map>
 
+class Lifetime;
 class Serializer;
 
 class Debug : public IProtocol
@@ -17,6 +18,8 @@ private:
 	IoContext ctx;
 	TcpSocket socket;
 	Resolver resolver;
+
+	Lifetime& lifetime;
 
 	std::string command;
 
@@ -30,7 +33,7 @@ private:
 
 	void handlerTask(std::stop_token stopToken);
 public:
-	Debug();
+	Debug(Lifetime& lifetime);
 	~Debug();
 
 	void run();

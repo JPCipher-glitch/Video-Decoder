@@ -5,7 +5,6 @@
 #include "lifetime.hpp"
 
 #include <iostream>
-#include <format>
 
 #pragma region CALLS
 void VideoManager::loadVideo(IPacket* packet)
@@ -15,7 +14,7 @@ void VideoManager::loadVideo(IPacket* packet)
 	{
 		if (PacketLoad* packetLoad = dynamic_cast<PacketLoad*>(packet))
 		{
-			videoMap[packetLoad->name] = VideoClass(packetLoad);
+			videoMap.emplace(packetLoad->name, std::make_unique<VideoClass>(path, packetLoad));
 		}
 	}
 	else
@@ -33,7 +32,12 @@ void VideoManager::call(IPacket* packet)
 #pragma endregion
 
 #pragma region CONSTRUCTOR
-VideoManager::VideoManager(Lifetime& lifetime) : lifetime(lifetime)
+void VideoManager::setPath(const std::string& p)
+{
+	path = p;
+}
+
+VideoManager::VideoManager(const std::string& path, Lifetime& lifetime) : path(path), lifetime(lifetime)
 {
 	// Fill the call map
 	callMap[COMMAND_TYPE::LOAD] = [this](IPacket* packet) { return loadVideo(packet); };

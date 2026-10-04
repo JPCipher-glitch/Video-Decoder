@@ -1,6 +1,9 @@
 #ifndef VIDEO_STUFF_HPP
 #define VIDEO_STUFF_HPP
 
+#include <unordered_map>
+#include <unordered_set>
+
 extern "C"
 {
 	#include <libavcodec/avcodec.h>
@@ -18,7 +21,8 @@ struct VideoStuff final
 	int videoStreamIndex = -1;
 
 	// Video informations
-	AVStream* videoStream = nullptr;
+	std::unordered_map<AVMediaType, AVStream*> videoStreamMap;
+	std::unordered_set<AVMediaType> availableStreamType{ AVMediaType::AVMEDIA_TYPE_VIDEO, AVMediaType::AVMEDIA_TYPE_AUDIO, AVMediaType::AVMEDIA_TYPE_SUBTITLE };
 	AVCodecParameters* codecParameters = nullptr;
 
 	// Video decoder

@@ -15,14 +15,17 @@ struct IPacket;
 class VideoManager : public IObserver
 {
 private:
+	std::string path;
 	Lifetime& lifetime;
-	std::unordered_map<std::string, VideoClass> videoMap;
+	std::unordered_map<std::string, std::unique_ptr<VideoClass>> videoMap;
 	std::unordered_map<COMMAND_TYPE, std::function<void(IPacket*)>> callMap;
 
 	void loadVideo(IPacket* packet);
 public:
-	VideoManager(Lifetime& lifetime);
+	VideoManager(const std::string& path, Lifetime& lifetime);
 	~VideoManager();
+
+	void setPath(const std::string& path);
 
 	void call(IPacket* packet) override;
 	void update();
