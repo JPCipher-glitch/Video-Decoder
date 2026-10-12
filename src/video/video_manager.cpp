@@ -54,6 +54,9 @@ VideoManager::~VideoManager()
 #pragma region UPDATE
 void VideoManager::update()
 {
-
+	for (auto& video : videoMap)
+	{
+		video.second->update();
+	}
 }
 #pragma endregion

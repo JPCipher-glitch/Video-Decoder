@@ -6,6 +6,7 @@
         "avcodec",
         "avformat",
         "swscale",
+        "swresample",
         "zlib"
       ]
     }
