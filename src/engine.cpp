@@ -1,5 +1,6 @@
 ﻿#include "engine.hpp"
 #include "video/video_manager.hpp"
+#include "Windows.h"
 
 #include <format>
 
@@ -29,18 +30,30 @@ void Engine::createCache(const std::string& path)
 	setDirectoryHidden(cacheDirectory);
 }
 
-Engine::Engine(const std::string& p) : path(p), videoManager(path, lifetime), debug(lifetime)
+Engine::Engine(const std::string& p) : path(p), videoManager(path, lifetime), debug(lifetime, errorHandler)
 {
-	if (path.length() <= 5)
+	// Set the cache path
+	if (path.length() <= 0)
 		path = "resources";
 
+	// Check if the folder exist to making the cache, else shutdown the engine
+	fs::path cacheDirectory = path;
+	if (!fs::exists(cacheDirectory))
+	{
+		std::wstring message = std::format(L"This folder is not valid for saving the video cache: ");
+		errorHandler.showError(message, true);
+		lifetime.destroy();
+		return;
+	}
+
+	// Set the cache path to the video manager
 	videoManager.setPath(path);
 
 	// Create cache folder
 	createCache(path);
 
 	// Create command server
-	command = std::make_shared<Command>();
+	command = std::make_shared<Command>(errorHandler);
 	command->accept();
 	command->run();
 	command->attach(&videoManager);
@@ -54,9 +67,7 @@ Engine::~Engine()
 	// Remove the cache directory
 	fs::path dirPath = std::format("{}/.cache", path);
 	if (fs::exists(dirPath) && fs::is_directory(dirPath))
-	{
 		fs::remove_all(dirPath);
-	}
 }
 
 void Engine::run()

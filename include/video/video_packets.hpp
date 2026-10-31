@@ -23,6 +23,10 @@ struct PacketLoad : public IPacket
 	uint16_t height = 1080u;
 	float fps = 60.f;
 
+	uint32_t audioSampleRate = 44100u;
+	uint16_t audioChannels = 2u;
+	int8_t audioQuality = 6u; // Apply only for .ogg audio
+
 	~PacketLoad() override {};
 };
 

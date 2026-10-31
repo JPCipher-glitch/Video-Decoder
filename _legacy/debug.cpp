@@ -25,6 +25,9 @@ void Debug::loadVideo(Serializer& s)
     s.write(packet.width);
     s.write(packet.height);
     s.write(packet.fps);
+
+    s.write(packet.audioSampleRate);
+    s.write(packet.audioChannels);
 }
 
 void Debug::sendPacket(const std::string& name)

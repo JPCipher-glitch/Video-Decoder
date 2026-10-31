@@ -9,7 +9,7 @@ extern "C"
 	#include <libavutil/avutil.h>
 }
 
-class IStream
+class IVidStream
 {
 protected:
 	// Path
@@ -24,14 +24,15 @@ protected:
 	// Encoder
 	const AVCodec* encoder = nullptr;
 	AVCodecContext* encoderContext = nullptr; // Context
+	AVFormatContext* formatContext = nullptr;
 
 	// Frame packet
 	AVPacket* sendPacket = nullptr;
 	AVPacket* receivePacket = nullptr;
 	AVFrame* frame = nullptr;
 public:
-	IStream(std::string path, AVStream* stream, int streamIndex) : path{ path }, stream { stream }, streamIndex{ streamIndex } {};
-	virtual ~IStream() {};
+	IVidStream(std::string path, AVStream* stream, int streamIndex) : path{ path }, stream { stream }, streamIndex{ streamIndex } {};
+	virtual ~IVidStream() {};
 	virtual void loadDecoder() = 0;
 	virtual void loadEncoder() = 0;
 	virtual void loadFrame() = 0;

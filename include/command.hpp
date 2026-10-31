@@ -5,6 +5,7 @@
 #include "serializer/protocol.hpp"
 #include "serializer/command_type.hpp"
 #include "observer.hpp"
+#include "error_handler.hpp"
 
 #include <array>
 #include <future>
@@ -44,8 +45,10 @@ private:
 	std::atomic_bool running = true;
 	std::jthread task;
 public:
-	Command();
+	Command(ErrorHandler& errorHandler);
 	~Command();
+
+	ErrorHandler& errorHandler;
 
 	bool isRunning() { return running; };
 

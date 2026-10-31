@@ -3,8 +3,10 @@
 #include "video/video_class.hpp"
 
 #include "lifetime.hpp"
-
 #include <iostream>
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 #pragma region CALLS
 void VideoManager::loadVideo(IPacket* packet)
@@ -13,9 +15,7 @@ void VideoManager::loadVideo(IPacket* packet)
 	if (!videoMap.contains(packet->name))
 	{
 		if (PacketLoad* packetLoad = dynamic_cast<PacketLoad*>(packet))
-		{
 			videoMap.emplace(packetLoad->name, std::make_unique<VideoClass>(path, packetLoad));
-		}
 	}
 	else
 	{
@@ -34,7 +34,9 @@ void VideoManager::call(IPacket* packet)
 #pragma region CONSTRUCTOR
 void VideoManager::setPath(const std::string& p)
 {
-	path = p;
+	fs::path videoDirectory = p;
+	if (fs::exists(videoDirectory))
+		path = p;
 }
 
 VideoManager::VideoManager(const std::string& path, Lifetime& lifetime) : path(path), lifetime(lifetime)

@@ -13,7 +13,7 @@ struct VideoStuff final
 	AVFormatContext* formatContext = nullptr;
 
 	// Video informations
-	std::unordered_map<AVMediaType, std::unique_ptr<IStream>> videoStreamMap;
+	std::unordered_map<AVMediaType, std::unique_ptr<IVidStream>> videoStreamMap;
 	std::unordered_set<AVMediaType> availableStreamType{ AVMediaType::AVMEDIA_TYPE_VIDEO, AVMediaType::AVMEDIA_TYPE_AUDIO, AVMediaType::AVMEDIA_TYPE_SUBTITLE };
 	AVCodecParameters* codecParameters = nullptr;
 };

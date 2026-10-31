@@ -11,6 +11,7 @@
 
 class Lifetime;
 class Serializer;
+class ErrorHandler;
 
 class Debug : public IProtocol
 {
@@ -20,6 +21,7 @@ private:
 	Resolver resolver;
 
 	Lifetime& lifetime;
+	ErrorHandler& errorHandler;
 
 	std::string command;
 
@@ -33,7 +35,7 @@ private:
 
 	void handlerTask(std::stop_token stopToken);
 public:
-	Debug(Lifetime& lifetime);
+	Debug(Lifetime& lifetime, ErrorHandler& errorHandler);
 	~Debug();
 
 	void run();

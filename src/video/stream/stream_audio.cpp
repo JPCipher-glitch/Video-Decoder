@@ -4,14 +4,10 @@
 #include <filesystem>
 
 #pragma region CONSTRUCTOR
-StreamAudio::StreamAudio(std::string path, AVStream* stream, int streamIndex) : IStream{ path, stream, streamIndex } 
+StreamAudio::StreamAudio(std::string path, AVStream* stream, int streamIndex) : IVidStream{ path, stream, streamIndex } 
 {
-    std::filesystem::path filePath = std::format("{}.wav", path);
-    filePath.replace_filename("audio.wav");
-    wavWriter = std::make_unique<WavWriter>(filePath.string(), 44100, 2);
-
     loadDecoder();
-    loadEncoder();
+    //loadEncoder();
     loadSwrContext();
     loadFrame();
 };
@@ -29,6 +25,24 @@ StreamAudio::~StreamAudio()
     avcodec_free_context(&encoderContext);
 };
 #pragma endregion
+
+#pragma region WRITER
+void StreamAudio::createAudioWriter(uint32_t sampleRate, uint16_t channels)
+{
+    audioSampleRate = sampleRate;
+    audioChannels = channels;
+
+    std::filesystem::path filePath = std::format("{}.wav", path);
+    filePath.replace_filename("audio.wav");
+    wavWriter = std::make_unique<WavWriter>(filePath.string(), audioSampleRate, audioChannels);
+
+    if (channels <= outputLayoutList.size())
+        outputLayoutIndex = static_cast<int>(channels) - 1;
+    else
+        throw std::runtime_error("ERROR: Invalid channels");
+}
+#pragma endregion
+
 
 #pragma region DECODER
 void StreamAudio::loadDecoder()
@@ -49,15 +63,31 @@ void StreamAudio::loadDecoder()
 #pragma region DECODER
 void StreamAudio::loadEncoder()
 {
-    //// Find a registered encoder
-    //encoder = avcodec_find_encoder(AVCodecID::AV_CODEC_ID_PCM_S16LE);
+    uint32_t sampleRate{ 0 }; uint16_t channels{0};
+    
+    // Find a registered encoder
+    encoder = avcodec_find_encoder(AV_CODEC_ID_VORBIS);
 
-    //// Create encoder context
-    //encoderContext = avcodec_alloc_context3(encoder);
+    if (encoder == nullptr)
+        throw std::runtime_error("Cannot find Vorbis encoder");
 
-    //// Open encoder
-    //if (avcodec_open2(encoderContext, encoder, nullptr) < 0)
-    //    throw std::runtime_error("Cannot open audio encoder");
+    // Create encoder context
+    encoderContext = avcodec_alloc_context3(encoder);
+
+    // Configure encoder
+    encoderContext->sample_rate = static_cast<int>(sampleRate);
+    encoderContext->sample_fmt = AV_SAMPLE_FMT_FLTP;
+    encoderContext->time_base = AVRational{ 1, encoderContext->sample_rate };
+
+    av_channel_layout_default(&encoderContext->ch_layout, channels);
+
+    // Compression quality: 0 to 10
+    encoderContext->flags |= AV_CODEC_FLAG_QSCALE;
+    encoderContext->global_quality = 5 * FF_QP2LAMBDA;
+
+    // Open encoder
+    if (avcodec_open2(encoderContext, encoder, nullptr) < 0)
+        throw std::runtime_error("Cannot open audio encoder");
 }
 #pragma endregion
 
@@ -67,7 +97,7 @@ void StreamAudio::loadSwrContext()
     swr_alloc_set_opts2
     (
         &swrContext,
-        &outputLayout,
+        &outputLayoutList[outputLayoutIndex],
         AV_SAMPLE_FMT_S16,
         44100,
         &decoderContext->ch_layout,
@@ -80,6 +110,21 @@ void StreamAudio::loadSwrContext()
     swr_init(swrContext);
 }
 #pragma endregion
+
+#pragma region AUDIO FORMAT
+void StreamAudio::loadFormatContext()
+{
+    // Load the format context to Write the OGG audio file
+    std::filesystem::path filePath = std::format("{}.ogg", path);
+    filePath.replace_filename("audio.ogg");
+    int result = avformat_alloc_output_context2(&formatContext, nullptr, ".ogg", filePath.string().c_str());
+
+    // Check if the ogg format context was normaly allocated
+    if (result < 0)
+        throw std::runtime_error("ERROR: Cannot allocate OGG format context");
+}
+#pragma endregion
+
 
 
 #pragma region FRAME
@@ -139,7 +184,7 @@ void StreamAudio::saveAsFile()
 
     convertedFrame->format = AV_SAMPLE_FMT_S16;
     convertedFrame->sample_rate = 44100;
-    av_channel_layout_copy(&convertedFrame->ch_layout, &outputLayout);
+    av_channel_layout_copy(&convertedFrame->ch_layout, &outputLayoutList[outputLayoutIndex]);
     convertedFrame->nb_samples = static_cast<int>(nbSamples);
 
     // Prepare the PCM buffer
@@ -161,9 +206,8 @@ void StreamAudio::saveAsFile()
     if (samples == 0)
         return;
 
-
-    // S16 interleaved, stereo: 2 channels * 2 bytes per sample
-    uint32_t pcmSize = static_cast<uint32_t>(samples * 2 * sizeof(int16_t));
+    // PCM size
+    uint32_t pcmSize = static_cast<uint32_t>(samples * audioChannels * sizeof(int16_t));
     wavWriter->writeSamples(convertedFrame->data[0], pcmSize);
 }
 #pragma endregion

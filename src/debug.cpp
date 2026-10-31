@@ -3,13 +3,14 @@
 #include "video/video_packets.hpp"
 #include "serializer/serializer.hpp"
 #include "lifetime.hpp"
+#include "error_handler.hpp"
 
 #include <conio.h>
 #include <iostream>
 #include <sstream>
 
 #pragma region CONSTRUCTOR
-Debug::Debug(Lifetime& lifetime) : lifetime(lifetime), socket{ ctx }, resolver{ ctx }
+Debug::Debug(Lifetime& lifetime, ErrorHandler& errorHandler) : lifetime(lifetime), errorHandler(errorHandler), socket{ctx}, resolver{ctx}
 {
     // Fill the map
     callMap["LOAD"] = [this](Serializer& s) { loadVideo(s); };
@@ -98,7 +99,10 @@ void Debug::handlerTask(std::stop_token stopToken)
             else if (callMap.contains(msg))
                 sendPacket(msg);
             else
+            {
+                errorHandler.showWarning(std::format(L"This command name is invalid: {}", errorHandler.toWString(msg)), false);
                 std::cerr << "INVALID COMMAND: " << msg << std::endl;
+            }
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }

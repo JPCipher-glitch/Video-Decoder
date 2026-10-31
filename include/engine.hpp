@@ -5,6 +5,7 @@
 #include "command.hpp"
 #include "lifetime.hpp"
 #include "debug.hpp"
+#include "error_handler.hpp"
 
 #include <filesystem>
 
@@ -17,6 +18,7 @@ private:
 	std::shared_ptr<Command> command;
 	Lifetime lifetime;
 	Debug debug;
+	ErrorHandler errorHandler;
 
 	void createCache(const std::string& path);
 	bool setDirectoryHidden(const std::filesystem::path& path);

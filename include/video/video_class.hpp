@@ -20,7 +20,7 @@ private:
 
 	bool initialized = false;
 
-	std::unordered_map<AVMediaType, std::function<std::unique_ptr<IStream>(AVStream*, int)>> loadStreamMap;
+	std::unordered_map<AVMediaType, std::function<std::unique_ptr<IVidStream>(AVStream*, int)>> loadStreamMap;
 
 	void createCacheFolder();
 

@@ -26,6 +26,10 @@ std::unique_ptr<IPacket> Command::loadVideo(Serializer& s)
     p->height = s.read<uint16_t>();
     p->fps = s.read<float>();
 
+    // Read the audio data
+    p->audioSampleRate = s.read<uint32_t>();
+    p->audioChannels = s.read<uint16_t>();
+
     // Return the packet
     return std::move(packet);
 }

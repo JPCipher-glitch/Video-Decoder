@@ -33,9 +33,12 @@ void ClientStuff::read(std::weak_ptr<Command> c)
             }
             else if (error) // Check if an error occured
             {
-                if (error != asio::error::eof)
+                if (error != asio::error::eof) // There is a problem with the client
+                {
+                    command->errorHandler.showError(command->errorHandler.toWString(error.message()), false);
                     std::cout << "ERROR: " << error.message() << std::endl;
-                else
+                }
+                else // The client disconnected safely
                     toRemove = true;
             }
         });
@@ -43,7 +46,7 @@ void ClientStuff::read(std::weak_ptr<Command> c)
 #pragma endregion
 
 #pragma region CONSTRUCTOR
-Command::Command() : server{ ctx }, acceptor{ ctx, TcpEndpoint(asio::ip::tcp::v4(), SERVER_PORT) }
+Command::Command(ErrorHandler& errorHandler) : server{ ctx }, errorHandler{ errorHandler }, acceptor{ctx, TcpEndpoint(asio::ip::tcp::v4(), SERVER_PORT)}
 {
     // Fill the map
     callMap[COMMAND_TYPE::LOAD] = [this](Serializer& s) { return loadVideo(s); };

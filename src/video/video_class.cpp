@@ -15,9 +15,7 @@ void VideoClass::loadContext()
 	// Open video
 	std::lock_guard<std::mutex> lock(mutex);
 	if (avformat_open_input(&stuff.formatContext, std::format("{}{}", settings.path, settings.videoFormat).c_str(), nullptr, nullptr) < 0)
-	{
 		std::cerr << std::format("ERROR: Invalid video path: {}{}\n", settings.path, settings.videoFormat);
-	}
 }
 
 void VideoClass::loadStreams()
@@ -69,7 +67,7 @@ VideoClass::VideoClass(const std::string& path, PacketLoad* packet) : path{ path
 	// Fill the load map
 	{
 		std::lock_guard<std::mutex> lock(mutex);
-		loadStreamMap.emplace(AVMediaType::AVMEDIA_TYPE_AUDIO, [this](AVStream* stream, int streamIndex) {return std::make_unique<StreamAudio>(std::format("{}/.cache/{}", this->path, settings.name), stream, streamIndex); });
+		loadStreamMap.emplace(AVMediaType::AVMEDIA_TYPE_AUDIO, [this](AVStream* stream, int streamIndex) { return std::make_unique<StreamAudio>(std::format("{}/.cache/{}", this->path, settings.name), stream, streamIndex); });
 	}
 
 	createCacheFolder();
@@ -94,6 +92,7 @@ void VideoClass::load()
 	if (loadStreamMap.contains(AVMediaType::AVMEDIA_TYPE_AUDIO))
 	{
 		StreamAudio* stream = dynamic_cast<StreamAudio*>(stuff.videoStreamMap[AVMediaType::AVMEDIA_TYPE_AUDIO].get());
+		stream->createAudioWriter(settings.audioSampleRate, settings.audioChannels);
 		stream->receiveFrame(stuff.formatContext);
 	}
 }
