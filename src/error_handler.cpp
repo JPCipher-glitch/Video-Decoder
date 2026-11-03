@@ -58,7 +58,7 @@ void ErrorHandler::showMessage(const std::wstring& message, const std::wstring& 
 std::wstring ErrorHandler::toWString(const std::string& str)
 {
 	int size = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, nullptr, 0);
-	std::wstring result(size, L'\0');
+	std::wstring result(size-1, L'\0');
 
 	MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, result.data(), size);
 	return result;

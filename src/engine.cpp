@@ -30,7 +30,7 @@ void Engine::createCache(const std::string& path)
 	setDirectoryHidden(cacheDirectory);
 }
 
-Engine::Engine(const std::string& p) : path(p), videoManager(path, lifetime), debug(lifetime, errorHandler)
+Engine::Engine(const std::string& p) : path(p), videoManager(path, lifetime, errorHandler), debug(lifetime, errorHandler)
 {
 	// Set the cache path
 	if (path.length() <= 0)
@@ -40,7 +40,7 @@ Engine::Engine(const std::string& p) : path(p), videoManager(path, lifetime), de
 	fs::path cacheDirectory = path;
 	if (!fs::exists(cacheDirectory))
 	{
-		std::wstring message = std::format(L"This folder is not valid for saving the video cache: ");
+		std::wstring message = std::format(L"This folder is not valid for saving the video cache:\n\"{}\"", errorHandler.toWString(path));
 		errorHandler.showError(message, true);
 		lifetime.destroy();
 		return;

@@ -15,10 +15,11 @@ void VideoManager::loadVideo(IPacket* packet)
 	if (!videoMap.contains(packet->name))
 	{
 		if (PacketLoad* packetLoad = dynamic_cast<PacketLoad*>(packet))
-			videoMap.emplace(packetLoad->name, std::make_unique<VideoClass>(path, packetLoad));
+			videoMap.emplace(packetLoad->name, std::make_unique<VideoClass>(path, packetLoad, errorHandler));
 	}
 	else
 	{
+		errorHandler.showWarning(std::format(L"This video was already loaded\nor have the same name with another one:\n\"{}\"", errorHandler.toWString(packet->name)), false);
 		std::cout << std::format("ERROR: VIDEO ALREADY LOADED: {}\n", packet->name);
 	}
 }
@@ -39,7 +40,7 @@ void VideoManager::setPath(const std::string& p)
 		path = p;
 }
 
-VideoManager::VideoManager(const std::string& path, Lifetime& lifetime) : path(path), lifetime(lifetime)
+VideoManager::VideoManager(const std::string& path, Lifetime& lifetime, ErrorHandler& errorHandler) : path(path), lifetime(lifetime), errorHandler(errorHandler)
 {
 	// Fill the call map
 	callMap[COMMAND_TYPE::LOAD] = [this](IPacket* packet) { return loadVideo(packet); };
@@ -58,7 +59,10 @@ void VideoManager::update()
 {
 	for (auto& video : videoMap)
 	{
-		video.second->update();
+		if (video.second->isValid())
+			video.second->update();
+		else
+			videoMap.erase(video.first);
 	}
 }
 #pragma endregion

@@ -8,30 +8,72 @@
 extern "C"
 {
 	#include <libswresample/swresample.h>
+	#include <libavutil/audio_fifo.h>
 }
+
+struct StreamAudioSettings
+{
+	std::string path;
+	std::string format;
+	AVStream* stream;
+	int streamIndex;
+	uint32_t sampleRate;
+	uint16_t channels;
+	int8_t quality;
+};
+
+struct WavStreamContext
+{
+	void createWavAudioWriter();
+};
+
+struct OggStreamContext
+{
+	void loadFormatContext();
+	void loadEncoder();
+	void createAudioStream();
+};
 
 class StreamAudio : public IVidStream
 {
 private:
-	int outputLayoutIndex = 0;
-	std::vector<AVChannelLayout> outputLayoutList{ AV_CHANNEL_LAYOUT_MONO, AV_CHANNEL_LAYOUT_STEREO };
-	SwrContext* swrContext = nullptr;
+	bool invalid{ false };
 
-	AVFrame* convertedFrame = nullptr;
+	int outputLayoutIndex{ 0 };
+	
+	std::vector<AVChannelLayout> outputLayoutList{ AV_CHANNEL_LAYOUT_MONO, AV_CHANNEL_LAYOUT_STEREO };
+	SwrContext* swrContext{ nullptr };
+	AVStream* outputStream{ nullptr };
+
+	AVAudioFifo* audioFifo{ nullptr };
+	int64_t nextOggPts{ 0 };
+
+	AVFrame* convertedFrame{ nullptr };
 	std::unique_ptr<WavWriter> wavWriter;
 
-	uint32_t audioSampleRate; 
-	uint16_t audioChannels;
+	StreamAudioSettings settings;
+
+	std::filesystem::path getFilePath(const std::string& format);
+	void createAudioCache();
+	void saveWavFile();
+	void saveOggFile();
+	void closeWavFile();
+	void closeOggFile();
+	void writeEncodedPackets();
+	void encodeCompleteFrames();
+	void closeFile();
 public:
-	StreamAudio(std::string path, AVStream* stream, int streamIndex);
+	StreamAudio(StreamAudioSettings settings, ErrorHandler& errorHandler);
 	~StreamAudio() override;
 
-	void createAudioWriter(uint32_t audioSampleRate, uint16_t audioChannels);
+	void createWavAudioWriter();
+	void createAudioStream();
 
 	void loadDecoder() override;
 	void loadEncoder() override;
 	void loadFrame() override;
-	void loadSwrContext();
+	void loadWavSwrContext();
+	void loadOggSwrContext();
 	void loadFormatContext();
 	void receiveFrame(AVFormatContext*& formatContext) override;
 	void saveAsFile() override;

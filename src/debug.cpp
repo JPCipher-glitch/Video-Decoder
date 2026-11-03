@@ -8,12 +8,13 @@
 #include <conio.h>
 #include <iostream>
 #include <sstream>
+#include <iomanip>
 
 #pragma region CONSTRUCTOR
 Debug::Debug(Lifetime& lifetime, ErrorHandler& errorHandler) : lifetime(lifetime), errorHandler(errorHandler), socket{ctx}, resolver{ctx}
 {
     // Fill the map
-    callMap["LOAD"] = [this](Serializer& s) { loadVideo(s); };
+    callMap["LOAD"] = [this](Serializer& s, std::stringstream& stream) { loadVideo(s, stream); };
 }
 #pragma endregion
 
@@ -44,14 +45,13 @@ void Debug::run()
 
 
 #pragma region COMMANDS
-void Debug::loadVideo(Serializer& s)
+void Debug::loadVideo(Serializer& s, std::stringstream& stream)
 {
     PacketLoad packet{};
-    /*packet.name = "Bart at the Blarney Stone";
-    packet.path = "C:/Tailscoco/Video/placeholder";*/
+    stream >> std::quoted(packet.name) >> std::quoted(packet.path);
 
-    packet.name = "Dewey & Della - Singing";
-    packet.path = "resources/ducktales";
+    /*packet.name = "Dewey & Della - Singing";
+    packet.path = "resources/ducktales";*/
 
     s.write(COMMAND_TYPE::LOAD);
 
@@ -64,16 +64,20 @@ void Debug::loadVideo(Serializer& s)
     s.write(packet.width);
     s.write(packet.height);
     s.write(packet.fps);
+
+    s.write(packet.audioSampleRate);
+    s.write(packet.audioChannels);
+    s.write(packet.audioQuality);
 }
 
-void Debug::sendPacket(const std::string& name)
+void Debug::sendPacket(const std::string& name, std::stringstream& ss)
 {
     // Get the command name
     command = name;
 
     // Serialize the data content
     Serializer s{};
-    callMap[command](s);
+    callMap[command](s, ss);
 
     // Send the new stream data to the server
     byte_stream stream = s.returnStream();
@@ -90,22 +94,26 @@ void Debug::handlerTask(std::stop_token stopToken)
         // Check if a key has been pressed. Used to clean the task if you've not yet typing
         if (_kbhit())
         {
-            std::string msg;
-            std::getline(std::cin, msg);
+            std::string input;
+            std::getline(std::cin, input);
+
+            std::stringstream ss(input);
+            std::string command;
+
+            ss >> command;
 
             // Check if the command is valid
-            if (msg == "QUIT")
+            if (command == "QUIT")
                 lifetime.destroy();
-            else if (callMap.contains(msg))
-                sendPacket(msg);
+            else if (callMap.contains(command))
+                sendPacket(command, ss);
             else
             {
-                errorHandler.showWarning(std::format(L"This command name is invalid: {}", errorHandler.toWString(msg)), false);
-                std::cerr << "INVALID COMMAND: " << msg << std::endl;
+                errorHandler.showWarning(std::format(L"This command name is invalid: {}", errorHandler.toWString(command)), false);
+                std::cerr << "INVALID COMMAND: " << command << std::endl;
             }
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 }
 #pragma endregion
-

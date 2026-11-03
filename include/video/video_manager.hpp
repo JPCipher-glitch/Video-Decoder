@@ -4,6 +4,7 @@
 #include "observer.hpp"
 #include "video/video_class.hpp"
 #include "serializer/command_type.hpp"
+#include "error_handler.hpp"
 
 #include <string>
 #include <unordered_map>
@@ -17,12 +18,13 @@ class VideoManager : public IObserver
 private:
 	std::string path;
 	Lifetime& lifetime;
+	ErrorHandler& errorHandler;
 	std::unordered_map<std::string, std::unique_ptr<VideoClass>> videoMap;
 	std::unordered_map<COMMAND_TYPE, std::function<void(IPacket*)>> callMap;
 
 	void loadVideo(IPacket* packet);
 public:
-	VideoManager(const std::string& path, Lifetime& lifetime);
+	VideoManager(const std::string& path, Lifetime& lifetime, ErrorHandler& errorHandler);
 	~VideoManager();
 
 	void setPath(const std::string& path);

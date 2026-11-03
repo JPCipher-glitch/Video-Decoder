@@ -8,6 +8,7 @@
 #include <thread>
 #include <mutex>
 #include <unordered_map>
+#include <sstream>
 
 class Lifetime;
 class Serializer;
@@ -25,10 +26,10 @@ private:
 
 	std::string command;
 
-	void loadVideo(Serializer& s);
-	void sendPacket(const std::string& name);
+	void loadVideo(Serializer& s, std::stringstream& stream);
+	void sendPacket(const std::string& name, std::stringstream& stream);
 
-	std::unordered_map<std::string, std::function<void(Serializer&)>> callMap;
+	std::unordered_map<std::string, std::function<void(Serializer&, std::stringstream&)>> callMap;
 
 	std::mutex mutex;
 	std::jthread task;
