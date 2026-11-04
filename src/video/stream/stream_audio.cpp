@@ -38,6 +38,11 @@ StreamAudio::StreamAudio(StreamAudioSettings s, ErrorHandler& errorHandler) : se
 #pragma region DESTRUCTOR
 StreamAudio::~StreamAudio()
 {
+    // Remove the cache directory
+    fs::path dirPath = std::format("{}/audio", path);
+    if (fs::exists(dirPath) && fs::is_directory(dirPath))
+        fs::remove_all(dirPath);
+
     // Cleanup
     av_frame_free(&frame);
     av_frame_free(&convertedFrame);

@@ -57,12 +57,17 @@ VideoManager::~VideoManager()
 #pragma region UPDATE
 void VideoManager::update()
 {
-	for (auto& video : videoMap)
+	for (auto video = videoMap.begin(); video != videoMap.end();)
 	{
-		if (video.second->isValid())
-			video.second->update();
+		if (video->second->isValid())
+		{
+			video->second->update();
+			video++;
+		}
 		else
-			videoMap.erase(video.first);
+		{
+			video = videoMap.erase(video);
+		}
 	}
 }
 #pragma endregion
