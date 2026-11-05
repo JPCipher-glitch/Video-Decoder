@@ -86,7 +86,8 @@ void StreamAudio::createAudioCache()
 fs::path StreamAudio::getFilePath(const std::string& format)
 {
     AVDictionaryEntry* language = av_dict_get(stream->metadata, "language", nullptr, 0);
-    fs::path filePath = std::format("{}/audio/audio_{}.{}", path, language->value, format);
+	const char* l = language != nullptr ? language->value : "und"; // Use "und" (undefined) if no language is specified
+    fs::path filePath = std::format("{}/audio/audio_{}.{}", path, l, format);
     return filePath;
 }
 #pragma endregion

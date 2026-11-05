@@ -17,7 +17,7 @@ struct PacketLoad : public IPacket
 
 	std::string frameFormat = ".jpg";
 	std::string audioFormat = ".ogg";
-	std::string videoFormat = ".mp4";
+	std::string videoFormat = ".mkv";
 
 	uint16_t width = 1920u;
 	uint16_t height = 1080u;

@@ -2,6 +2,7 @@
 #include "lifetime.hpp"
 
 #include "video/stream/stream_audio.hpp"
+#include "video/stream/stream_subtitles.hpp"
 
 #include <iostream>
 #include <filesystem>
@@ -102,6 +103,13 @@ VideoClass::VideoClass(const std::string& path, PacketLoad* packet, ErrorHandler
 		{
 			StreamAudioSettings audioSettings{ std::format("{}/.cache/{}", this->path, settings.name), settings.audioFormat, stream, streamIndex, settings.audioSampleRate, settings.audioChannels, settings.audioQuality };
 			auto s = std::make_unique<StreamAudio>(audioSettings, errorHandler);
+			s->receiveFrame(stuff.formatContext);
+			return std::move(s);
+		});
+		loadStreamMap.emplace(AVMediaType::AVMEDIA_TYPE_SUBTITLE, [this](AVStream* stream, int streamIndex)
+		{
+			StreamSubSettings subSettings{ std::format("{}/.cache/{}", this->path, settings.name), stream, streamIndex };
+			auto s = std::make_unique<StreamSubtitles>(subSettings, errorHandler);
 			s->receiveFrame(stuff.formatContext);
 			return std::move(s);
 		});

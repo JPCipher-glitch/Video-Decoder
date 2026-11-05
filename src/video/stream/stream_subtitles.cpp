@@ -5,6 +5,8 @@
 
 namespace fs = std::filesystem;
 
+void StreamSubtitles::loadEncoder() {}
+
 #pragma region CONSTRUCTOR
 StreamSubtitles::StreamSubtitles(StreamSubSettings s, ErrorHandler& errorHandler) : settings{ s }, IVidStream{ errorHandler, s.path, s.stream, s.streamIndex }
 {
@@ -26,8 +28,8 @@ StreamSubtitles::~StreamSubtitles()
     // Cleanup
     av_frame_free(&frame);
     av_packet_free(&sendPacket);
-    av_packet_free(&receivePacket);
     avcodec_free_context(&decoderContext);
+    avsubtitle_free(&subtitle);
 }
 #pragma endregion
 
@@ -70,8 +72,7 @@ fs::path StreamSubtitles::getFilePath(const std::string& format)
 #pragma region TIME FORMAT
 std::string StreamSubtitles::formatTimestamp(int64_t milliseconds)
 {
-    if (milliseconds < 0)
-        milliseconds = (milliseconds >= 0 ? milliseconds : 0);
+    milliseconds = (milliseconds < 0 ? 0 : milliseconds);
 
     int64_t hours = milliseconds / 3600000;
     int64_t minutes = (milliseconds / 60000) % 60;
@@ -91,8 +92,25 @@ void StreamSubtitles::loadFrame()
 {
     // Allocate the AVPacket & AVFrame
     sendPacket = av_packet_alloc();
-    receivePacket = av_packet_alloc();
     frame = av_frame_alloc();
+}
+
+bool StreamSubtitles::writeFrame(AVFormatContext*& formatContext)
+{
+    // Get the subs stream
+    if (sendPacket->stream_index == streamIndex)
+    {
+        // Decode the subtitle packet
+        int result = avcodec_decode_subtitle2(decoderContext, &subtitle, &gotSubtitle, sendPacket);
+        if (result == AVERROR(EAGAIN) || result == AVERROR_EOF)
+            return false;
+
+        // Save the subtitle to file if it was successfully decoded
+        if (gotSubtitle)
+            saveAsFile();
+    }
+    av_packet_unref(sendPacket); // Wipe the packet to reusing it
+    return true;
 }
 
 void StreamSubtitles::receiveFrame(AVFormatContext*& formatContext)
@@ -103,31 +121,11 @@ void StreamSubtitles::receiveFrame(AVFormatContext*& formatContext)
     // Decode frames
     while (av_read_frame(formatContext, sendPacket) >= 0)
     {
-        // Get the audio stream
-        if (sendPacket->stream_index == streamIndex)
-        {
-            // Send compressed packet to decoder
-            avcodec_send_packet(decoderContext, sendPacket);
-
-            // Receive decoded frames
-            while (true)
-            {
-                // Receive the decoded data frame
-                int result = avcodec_receive_frame(decoderContext, frame);
-                if (result == AVERROR(EAGAIN) || result == AVERROR_EOF)
-                    break;
-
-                // Create the audio file
-                saveAsFile();
-
-                // Wipe the packet to reusing it
-                av_frame_unref(frame);
-            }
-        }
-        av_packet_unref(sendPacket); // Wipe the packet to reusing it
+        if (!writeFrame(formatContext))
+            break;
     }
 
-    // Close the audio file to complete it
+    // Close the subs file to complete it
     closeFile();
 }
 #pragma endregion
@@ -147,12 +145,13 @@ void StreamSubtitles::createSubFile()
 std::string StreamSubtitles::extractAssText(const char* ass)
 {
     std::string result = ass;
-    if (result.starts_with("Dialogue:"))
+    if (result.starts_with("Dialogue:")) // Remove the prefix
     {
         result.erase(0, result.find(':') + 1);
         if (!result.empty() && result[0] == ' ')
             result.erase(0, 1);
     }
+
 
     for (int i = 0; i < 8; i++)
     {
@@ -207,27 +206,32 @@ std::string StreamSubtitles::extractAssText(const char* ass)
 
     return cleaned;
 }
-std::string StreamSubtitles::extractText(const AVSubtitle& subtitle)
+std::string StreamSubtitles::extractText()
 {
     std::string result;
     for (unsigned int i = 0; i < subtitle.num_rects; i++)
     {
+		// Get the subtitle rectangle text
         AVSubtitleRect* rect = subtitle.rects[i];
-        if (rect->text)
+        if (rect->text) // Check if the text is classic text
         {
+			// Add a newline
             if (!result.empty())
                 result += "\n";
 
+            // Append the text to the result string
             result += rect->text;
         }
-        else if (rect->ass)
+		else if (rect->ass) // Else check if the text is ASS formatted text
         {
             std::string text = extractAssText(rect->ass);
             if (!text.empty())
             {
+                // Add a newline
                 if (!result.empty())
                     result += "\n";
 
+                // Append the text to the result string
                 result += text;
             }
         }
@@ -237,61 +241,46 @@ std::string StreamSubtitles::extractText(const AVSubtitle& subtitle)
 }
 void StreamSubtitles::saveAsFile()
 {
-    std::string text = extractText(subtitle);
-
+	// Extract the subtitle text from the AVSubtitle struct
+    std::string text = extractText();
     if (text.empty())
-    {
         return;
-    }
 
+	// Calculate the base PTS
     int64_t basePts = subtitle.pts;
-
-    if (basePts == AV_NOPTS_VALUE &&
-        packet &&
-        packet->pts != AV_NOPTS_VALUE)
-    {
-        basePts = av_rescale_q(
-            packet->pts,
-            stream->time_base,
-            AV_TIME_BASE_Q
-        );
-    }
+    if (basePts == AV_NOPTS_VALUE && sendPacket->pts != AV_NOPTS_VALUE)
+        basePts = av_rescale_q(sendPacket->pts, stream->time_base, AV_TIME_BASE_Q);
 
     if (basePts == AV_NOPTS_VALUE)
-    {
         return;
-    }
 
-    int64_t startTime =
-        basePts / 1000 + subtitle.start_display_time;
+	// Get the start and end timestamps
+    int64_t startTime = basePts / 1000 + subtitle.start_display_time;
+    int64_t endTime = basePts / 1000 + subtitle.end_display_time;
 
-    int64_t endTime =
-        basePts / 1000 + subtitle.end_display_time;
-
+	// If the end time is less than or equal to the start time, use the packet duration to calculate the end time
     if (endTime <= startTime)
     {
-        if (!packet || packet->duration <= 0)
-        {
+        if (!sendPacket || sendPacket->duration <= 0)
             return;
-        }
 
-        endTime = startTime + av_rescale_q(
-            packet->duration,
-            stream->time_base,
-            AVRational{ 1, 1000 }
-        );
+        endTime = startTime + av_rescale_q(sendPacket->duration, stream->time_base, AVRational{ 1, 1000 });
     }
+    subsIndex++;
 
-    outputFile << subtitleIndex++ << "\r\n" << formatTimestamp(startTime) << " --> " << formatTimestamp(endTime) << "\r\n" << text << "\r\n\r\n";
+    // Write the sub line into the file
+    outputFile << subsIndex << "\r\n" << formatTimestamp(startTime) << " --> " << formatTimestamp(endTime) << "\r\n" << text << "\r\n\r\n";
 }
 #pragma endregion
 #pragma region CLOSE FILE
 void StreamSubtitles::closeFile()
 {
-    if (settings.format == ".wav")
-        closeWavFile();
-    else if (settings.format == ".ogg")
-        closeOggFile();
+	// Flush the decoder to get the last subs
+    AVPacket flushPacket{};
+    writeFrame(formatContext);
+
+	// Close the file to complete it
+    outputFile.close();
 }
 #pragma endregion
 #pragma endregion
