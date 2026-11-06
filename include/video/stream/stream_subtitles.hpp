@@ -15,7 +15,6 @@ struct StreamSubSettings
 class StreamSubtitles : public IVidStream
 {
 private:
-	bool invalid{ false };
 	AVSubtitle subtitle{};
 	StreamSubSettings settings;
 	std::ofstream outputFile;

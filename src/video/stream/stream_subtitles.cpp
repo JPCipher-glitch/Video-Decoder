@@ -45,7 +45,11 @@ void StreamSubtitles::loadDecoder()
 
     // Open decoder
     if (avcodec_open2(decoderContext, decoder, nullptr) < 0)
-        throw std::runtime_error("Cannot open audio decoder");
+    {
+        invalid = true;
+        errorHandler.showError(L"Cannot open audio decoder", false);
+        return;
+    }
 }
 #pragma endregion
 
@@ -90,6 +94,7 @@ std::string StreamSubtitles::formatTimestamp(int64_t milliseconds)
 #pragma region FRAME
 void StreamSubtitles::loadFrame()
 {
+    if (invalid) return;
     // Allocate the AVPacket & AVFrame
     sendPacket = av_packet_alloc();
     frame = av_frame_alloc();
@@ -115,6 +120,8 @@ bool StreamSubtitles::writeFrame(AVFormatContext*& formatContext)
 
 void StreamSubtitles::receiveFrame(AVFormatContext*& formatContext)
 {
+    if (invalid) return;
+
     av_seek_frame(formatContext, -1, 0, AVSEEK_FLAG_BACKWARD); // Reset the reader cursor into the start
     avcodec_flush_buffers(decoderContext); // Wipe the last buffers before reading another sample
 
@@ -134,6 +141,8 @@ void StreamSubtitles::receiveFrame(AVFormatContext*& formatContext)
 #pragma region LOAD
 void StreamSubtitles::createSubFile()
 {
+    if (invalid) return;
+
     if (!outputFile.is_open())
     {
         fs::path filePath = getFilePath("srt");

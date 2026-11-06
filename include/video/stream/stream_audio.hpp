@@ -37,8 +37,6 @@ struct OggStreamContext
 class StreamAudio : public IVidStream
 {
 private:
-	bool invalid{ false };
-
 	int outputLayoutIndex{ 0 };
 	
 	std::vector<AVChannelLayout> outputLayoutList{ AV_CHANNEL_LAYOUT_MONO, AV_CHANNEL_LAYOUT_STEREO };

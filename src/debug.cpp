@@ -14,7 +14,38 @@
 Debug::Debug(Lifetime& lifetime, ErrorHandler& errorHandler) : lifetime(lifetime), errorHandler(errorHandler), socket{ctx}, resolver{ctx}
 {
     // Fill the map
-    callMap["LOAD"] = [this](Serializer& s, std::stringstream& stream) { loadVideo(s, stream); };
+    callMap.emplace("LOAD", [this](Serializer& s, std::stringstream& stream) { loadVideo(s, stream); });
+
+    // Fill the command map
+    commandMap.emplace("--name", [this](std::stringstream& stream, IPacket* p)
+        {
+            stream >> std::quoted(p->name); 
+            p->name = p->name.empty() ? "Dewey & Della - Singing" : p->name;
+        });
+    commandMap.emplace("--path", [this](std::stringstream& stream, IPacket* p)
+        {
+            PacketLoad* packet = dynamic_cast<PacketLoad*>(p);
+            stream >> std::quoted(packet->path);
+            packet->path = packet->path.empty() ? "resources/ducktales" : packet->path;
+        });
+    commandMap.emplace("--video-format", [this](std::stringstream& stream, IPacket* p)
+        {
+            PacketLoad* packet = dynamic_cast<PacketLoad*>(p);
+            stream >> std::quoted(packet->videoFormat);
+            packet->videoFormat = packet->videoFormat.empty() || packet->videoFormat.front() != '.' ? ".mp4" : packet->videoFormat;
+        });
+    commandMap.emplace("--audio-format", [this](std::stringstream& stream, IPacket* p)
+        {
+            PacketLoad* packet = dynamic_cast<PacketLoad*>(p);
+            stream >> std::quoted(packet->audioFormat);
+            packet->audioFormat = packet->audioFormat.empty() || packet->audioFormat.front() != '.' ? ".wav" : packet->audioFormat;
+        });
+    commandMap.emplace("--frame-format", [this](std::stringstream& stream, IPacket* p)
+        {
+            PacketLoad* packet = dynamic_cast<PacketLoad*>(p);
+            stream >> std::quoted(packet->frameFormat);
+            packet->frameFormat = packet->frameFormat.empty() || packet->frameFormat.front() != '.' ? ".jpg" : packet->frameFormat;
+        });
 }
 #pragma endregion
 
@@ -45,13 +76,25 @@ void Debug::run()
 
 
 #pragma region COMMANDS
-void Debug::loadVideo(Serializer& s, std::stringstream& stream)
+void Debug::loadVideo(Serializer& s, std::stringstream& ss)
 {
     PacketLoad packet{};
-    stream >> std::quoted(packet.name) >> std::quoted(packet.path);
 
-    /*packet.name = "Dewey & Della - Singing";
-    packet.path = "resources/ducktales";*/
+    // Extract each commands
+    std::string command;
+    while (ss >> command)
+    {
+        if (commandMap.contains(command))
+            commandMap[command](ss, &packet);
+        else
+            errorHandler.showWarning(std::format(L"This sub-command name is invalid: {}", errorHandler.toWString(command)), false);
+    }
+
+    ss >> std::quoted(packet.name) >> std::quoted(packet.path);
+
+    // Make sure the name & the path is not invalid
+    packet.name = packet.name.empty() ? "Dewey & Della - Singing" : packet.name;
+    packet.path = packet.path.empty() ? "resources/ducktales" : packet.path;
 
     s.write(COMMAND_TYPE::LOAD);
 

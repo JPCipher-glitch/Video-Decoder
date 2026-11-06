@@ -151,5 +151,14 @@ void VideoClass::update()
 		load();
 
 	initialized = true;
+
+	// Erase all the invalid streams that got an error
+	for (auto video = stuff.videoStreamMap.begin(); video != stuff.videoStreamMap.end();)
+	{
+		if (video->second->isInvalid())
+			video = stuff.videoStreamMap.erase(video);
+		else
+			video++;
+	}
 }
 #pragma endregion

@@ -12,6 +12,8 @@ StreamAudio::StreamAudio(StreamAudioSettings s, ErrorHandler& errorHandler) : se
     loadDecoder();
     loadFrame();
 
+    if (invalid) return;
+
     // 1 - WAV
     if (s.format == ".wav")
     {
@@ -67,7 +69,11 @@ void StreamAudio::loadDecoder()
 
     // Open decoder
     if (avcodec_open2(decoderContext, decoder, nullptr) < 0)
-        throw std::runtime_error("Cannot open audio decoder");
+    {
+        invalid = true;
+        errorHandler.showError(L"Cannot open audio decoder", false);
+        return;
+    }
 }
 #pragma endregion
 
@@ -249,6 +255,8 @@ void StreamAudio::loadOggSwrContext()
 #pragma region FRAME
 void StreamAudio::loadFrame()
 {
+    if (invalid) return;
+
     // Allocate the AVPacket & AVFrame
     sendPacket = av_packet_alloc();
     receivePacket = av_packet_alloc();
@@ -258,6 +266,8 @@ void StreamAudio::loadFrame()
 
 void StreamAudio::receiveFrame(AVFormatContext*& formatContext)
 {
+    if (invalid) return;
+
     av_seek_frame(formatContext, -1, 0, AVSEEK_FLAG_BACKWARD); // Reset the reader cursor into the start
     avcodec_flush_buffers(decoderContext); // Wipe the last buffers before reading another sample
 
