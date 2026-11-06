@@ -13,6 +13,7 @@
 class Lifetime;
 class Serializer;
 class ErrorHandler;
+class IPacket;
 
 class Debug : public IProtocol
 {
@@ -30,6 +31,7 @@ private:
 	void sendPacket(const std::string& name, std::stringstream& stream);
 
 	std::unordered_map<std::string, std::function<void(Serializer&, std::stringstream&)>> callMap;
+	std::unordered_map<std::string, std::function<void(std::stringstream&, IPacket*)>> commandMap;
 
 	std::mutex mutex;
 	std::jthread task;

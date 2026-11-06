@@ -2,6 +2,7 @@
 #include "lifetime.hpp"
 
 #include "video/stream/stream_audio.hpp"
+#include "video/stream/stream_subtitles.hpp"
 
 #include <iostream>
 #include <filesystem>
@@ -17,6 +18,7 @@ VideoClass::VideoClass(ErrorHandler& errorHandler) : errorHandler{ errorHandler 
 #pragma region STREAMS
 void VideoClass::loadContext()
 {
+	if (!valid) return;
 	// Open video
 	std::lock_guard<std::mutex> lock(mutex);
 	if (avformat_open_input(&stuff.formatContext, std::format("{}{}", settings.path, settings.videoFormat).c_str(), nullptr, nullptr) < 0)
@@ -29,6 +31,7 @@ void VideoClass::loadContext()
 
 void VideoClass::loadStreams()
 {
+	if (!valid) return;
 	if (!stuff.formatContext) return;
 
 	// Read stream information
@@ -71,10 +74,22 @@ void VideoClass::displayInfo()
 #pragma region CACHE
 void VideoClass::createCacheFolder()
 {
+	if (!valid) return;
+
 	// Create the video's cache directory if it don't yet exist
 	fs::path videoDirectory = std::format("{}/.cache/{}", path, settings.name);
 	if (!fs::exists(videoDirectory))
-		fs::create_directories(videoDirectory);
+	{
+		try
+		{
+			fs::create_directories(videoDirectory);
+		}
+		catch (const std::filesystem::filesystem_error& e)
+		{
+			valid = false;
+			errorHandler.showError(std::format(L"Failed to create the cache directory \"{}\"", errorHandler.toWString(videoDirectory.string())), false);
+		}
+	}
 }
 #pragma endregion
 
@@ -91,6 +106,13 @@ VideoClass::VideoClass(const std::string& path, PacketLoad* packet, ErrorHandler
 			s->receiveFrame(stuff.formatContext);
 			return std::move(s);
 		});
+		loadStreamMap.emplace(AVMediaType::AVMEDIA_TYPE_SUBTITLE, [this](AVStream* stream, int streamIndex)
+		{
+			StreamSubSettings subSettings{ std::format("{}/.cache/{}", this->path, settings.name), stream, streamIndex };
+			auto s = std::make_unique<StreamSubtitles>(subSettings, errorHandler);
+			s->receiveFrame(stuff.formatContext);
+			return std::move(s);
+		});
 	}
 
 	if (valid)
@@ -101,6 +123,10 @@ VideoClass::VideoClass(const std::string& path, PacketLoad* packet, ErrorHandler
 #pragma region DESTRUCTOR
 VideoClass::~VideoClass()
 {
+	// Remove the cache directory
+	fs::path dirPath = std::format("{}/.cache/{}", path, settings.name);
+	if (fs::exists(dirPath) && fs::is_directory(dirPath))
+		fs::remove_all(dirPath);
 	avformat_close_input(&stuff.formatContext);
 }
 #pragma endregion
@@ -108,6 +134,9 @@ VideoClass::~VideoClass()
 #pragma region LOAD
 void VideoClass::load()
 {
+	if (!valid)
+		return;
+
 	createCacheFolder();
 	loadContext();
 	loadStreams();
@@ -122,5 +151,14 @@ void VideoClass::update()
 		load();
 
 	initialized = true;
+
+	// Erase all the invalid streams that got an error
+	for (auto video = stuff.videoStreamMap.begin(); video != stuff.videoStreamMap.end();)
+	{
+		if (video->second->isInvalid())
+			video = stuff.videoStreamMap.erase(video);
+		else
+			video++;
+	}
 }
 #pragma endregion

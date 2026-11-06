@@ -13,6 +13,7 @@ extern "C"
 class IVidStream
 {
 protected:
+	bool invalid{ false };
 	// Path
 	std::string path;
 	// Stream
@@ -42,6 +43,8 @@ public:
 	virtual void loadFrame() = 0;
 	virtual void receiveFrame(AVFormatContext*& formatContext) = 0;
 	virtual void saveAsFile() = 0;
+
+	bool isInvalid() { return invalid; }
 };
 
 #endif
