@@ -50,7 +50,7 @@ VideoManager::VideoManager(const std::string& path, Lifetime& lifetime, ErrorHan
 #pragma region DESTRUCTOR
 VideoManager::~VideoManager()
 {
-
+	videoMap.clear();
 }
 #pragma endregion
 

@@ -116,7 +116,11 @@ VideoClass::VideoClass(const std::string& path, PacketLoad* packet, ErrorHandler
 	}
 
 	if (valid)
-		std::cout << std::format("VIDEO LOADED: {} -> {}{}\n", settings.name, settings.path, settings.videoFormat);
+	{
+		double now = std::chrono::duration<float>(std::chrono::steady_clock::now().time_since_epoch()).count();
+		double duration = now - settings.timePoint;
+		std::cout << std::format("VIDEO LOADED: {} -> {}{} in {}s\n", settings.name, settings.path, settings.videoFormat, duration);
+	}
 }
 #pragma endregion
 

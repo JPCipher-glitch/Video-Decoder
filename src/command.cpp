@@ -110,6 +110,7 @@ std::unique_ptr<IPacket> Command::loadVideo(Serializer& s)
 
     // Add the type of the packet
     p->type = COMMAND_TYPE::LOAD;
+    p->timePoint = s.read<double>();
 
     // Read the string buffer
     p->name = s.readString();

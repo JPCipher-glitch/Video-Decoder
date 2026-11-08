@@ -8,6 +8,7 @@ struct IPacket
 {
 	std::string name;
 	COMMAND_TYPE type;
+	double timePoint = 0;
 	virtual ~IPacket() {};
 };
 

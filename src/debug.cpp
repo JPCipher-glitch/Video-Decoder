@@ -79,6 +79,7 @@ void Debug::run()
 void Debug::loadVideo(Serializer& s, std::stringstream& ss)
 {
     PacketLoad packet{};
+    packet.timePoint = std::chrono::duration<float>(std::chrono::steady_clock::now().time_since_epoch()).count(); // Get the last time point to display after the sending packet duration
 
     // Extract each commands
     std::string command;
@@ -97,6 +98,7 @@ void Debug::loadVideo(Serializer& s, std::stringstream& ss)
     packet.path = packet.path.empty() ? "resources/ducktales" : packet.path;
 
     s.write(COMMAND_TYPE::LOAD);
+    s.write(packet.timePoint);
 
     s.writeString(packet.name);
     s.writeString(packet.path);
