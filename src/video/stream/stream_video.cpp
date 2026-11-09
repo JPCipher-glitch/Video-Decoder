@@ -5,15 +5,15 @@
 
 namespace fs = std::filesystem;
 
-void StreamVideo::loadEncoder() {}
-
 #pragma region CONSTRUCTOR
 StreamVideo::StreamVideo(StreamFrameSettings s, ErrorHandler& errorHandler) : settings{ s }, IVidStream{ errorHandler, s.path, s.stream, s.streamIndex }
 {
     createFramesCache();
     loadDecoder();
+    loadEncoder();
     loadFrame();
     loadSwsContext();
+    createExportFrame();
 }
 #pragma endregion
 
@@ -28,7 +28,9 @@ StreamVideo::~StreamVideo()
     // Cleanup
     av_frame_free(&frame);
     av_packet_free(&sendPacket);
+    av_packet_free(&receivePacket);
     avcodec_free_context(&decoderContext);
+    avcodec_free_context(&encoderContext);
 }
 #pragma endregion
 
@@ -49,6 +51,26 @@ void StreamVideo::loadDecoder()
         errorHandler.showError(L"Cannot open video decoder", false);
         return;
     }
+}
+#pragma endregion
+
+#pragma region ENCODER
+void StreamVideo::loadEncoder()
+{
+    // Find the encoder context
+    encoder = avcodec_find_encoder(AVCodecID::AV_CODEC_ID_PNG);
+
+    // Create the PNG encoder
+    encoderContext = avcodec_alloc_context3(encoder);
+
+    // Get the settings
+    encoderContext->width = settings.width;
+    encoderContext->height = settings.height;
+    encoderContext->pix_fmt = AV_PIX_FMT_RGB24;
+    encoderContext->time_base = { 1, 25 };
+
+    // Open encoder
+    avcodec_open2(encoderContext, encoder, nullptr);
 }
 #pragma endregion
 
@@ -74,6 +96,20 @@ void StreamVideo::loadSwsContext()
 }
 #pragma endregion
 
+#pragma region EXPORT FRAME
+void StreamVideo::createExportFrame()
+{
+    // Create the RGB frame
+    exportFrame = av_frame_alloc();
+
+    exportFrame->format = AV_PIX_FMT_RGB24;
+    exportFrame->width = encoderContext->width;
+    exportFrame->height = encoderContext->height;
+    av_frame_get_buffer(exportFrame, 0);
+}
+#pragma endregion
+
+
 #pragma region CACHE
 void StreamVideo::createFramesCache()
 {
@@ -88,8 +124,7 @@ void StreamVideo::createFramesCache()
 #pragma region FILE PATH
 fs::path StreamVideo::getFilePath(const std::string& format)
 {
-    AVDictionaryEntry* language = av_dict_get(stream->metadata, "language", nullptr, 0);
-    fs::path filePath = std::format("{}/frames/frame_{}.{}", path, language->value, format);
+    fs::path filePath = std::format("{}/frames/frame_{:06}{}", path, frameIndex, format);
     return filePath;
 }
 #pragma endregion
@@ -102,21 +137,31 @@ void StreamVideo::loadFrame()
     // Allocate the AVPacket & AVFrame
     sendPacket = av_packet_alloc();
     frame = av_frame_alloc();
+    receivePacket = av_packet_alloc();
 }
 
 bool StreamVideo::writeFrame(AVFormatContext*& formatContext)
 {
-    // Get the subs stream
+    // Get the audio stream
     if (sendPacket->stream_index == streamIndex)
     {
-        // Decode the subtitle packet
-        int result = avcodec_decode_subtitle2(decoderContext, &subtitle, &gotSubtitle, sendPacket);
-        if (result == AVERROR(EAGAIN) || result == AVERROR_EOF)
-            return false;
+        // Send compressed packet to decoder
+        avcodec_send_packet(decoderContext, sendPacket);
 
-        // Save the subtitle to file if it was successfully decoded
-        if (gotSubtitle)
+        // Receive decoded frames
+        while (true)
+        {
+            // Receive the decoded data frame
+            int result = avcodec_receive_frame(decoderContext, frame);
+            if (result == AVERROR(EAGAIN) || result == AVERROR_EOF)
+                return true;
+
+            // Create the audio file
             saveAsFile();
+
+            // Wipe the packet to reusing it
+            av_frame_unref(frame);
+        }
     }
     av_packet_unref(sendPacket); // Wipe the packet to reusing it
     return true;
@@ -144,46 +189,46 @@ void StreamVideo::receiveFrame(AVFormatContext*& formatContext)
 #pragma region FILE
 void StreamVideo::saveAsFile()
 {
-	// Extract the subtitle text from the AVSubtitle struct
-    std::string text = extractText();
-    if (text.empty())
-        return;
+    // Rescale the export frame with the sws ctx
+    sws_scale
+    (
+        swsContext,
 
-	// Calculate the base PTS
-    int64_t basePts = subtitle.pts;
-    if (basePts == AV_NOPTS_VALUE && sendPacket->pts != AV_NOPTS_VALUE)
-        basePts = av_rescale_q(sendPacket->pts, stream->time_base, AV_TIME_BASE_Q);
+        frame->data,
+        frame->linesize,
 
-    if (basePts == AV_NOPTS_VALUE)
-        return;
+        0,
+        frame->height,
 
-	// Get the start and end timestamps
-    int64_t startTime = basePts / 1000 + subtitle.start_display_time;
-    int64_t endTime = basePts / 1000 + subtitle.end_display_time;
+        exportFrame->data,
+        exportFrame->linesize
+    );
 
-	// If the end time is less than or equal to the start time, use the packet duration to calculate the end time
-    if (endTime <= startTime)
+    // Create the frame packet
+    int result = avcodec_send_frame(encoderContext, frame);
+    if (result >= 0)
+        result = avcodec_receive_packet(encoderContext, receivePacket);
+    else
     {
-        if (!sendPacket || sendPacket->duration <= 0)
-            return;
-
-        endTime = startTime + av_rescale_q(sendPacket->duration, stream->time_base, AVRational{ 1, 1000 });
+        std::cerr << "Failed to receive PNG packet!" << std::endl;
+        return;
     }
-    subsIndex++;
 
-    // Write the sub line into the file
-    outputFile << subsIndex << "\r\n" << formatTimestamp(startTime) << " --> " << formatTimestamp(endTime) << "\r\n" << text << "\r\n\r\n";
+    // Save the frame into an image
+    std::ofstream file(getFilePath(settings.format), std::ios::binary);
+    file.write(reinterpret_cast<const char*>(receivePacket->data), receivePacket->size);
+    file.close();
+
+    // Wipe the packet to reusing it
+    av_packet_unref(receivePacket);
+
+    frameIndex++;
 }
 #pragma endregion
 #pragma region CLOSE FILE
 void StreamVideo::closeFile()
 {
-	// Flush the decoder to get the last subs
-    AVPacket flushPacket{};
-    writeFrame(formatContext);
 
-	// Close the file to complete it
-    outputFile.close();
 }
 #pragma endregion
 #pragma endregion

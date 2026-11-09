@@ -25,11 +25,14 @@ struct StreamFrameSettings
 class StreamVideo : public IVidStream
 {
 private:
+	uint8_t frameIndex{ 0U };
 	StreamFrameSettings settings;
 	SwsContext* swsContext{ nullptr };
+	AVFrame* exportFrame{ nullptr };
 
 	void createSubFile();
 	void createFramesCache();
+	void createExportFrame();
 	bool writeFrame(AVFormatContext*& formatContext);
 	std::filesystem::path getFilePath(const std::string& format);
 public:

@@ -3,6 +3,7 @@
 
 #include "video/stream/stream_audio.hpp"
 #include "video/stream/stream_subtitles.hpp"
+#include "video/stream/stream_video.hpp"
 
 #include <iostream>
 #include <filesystem>
@@ -99,6 +100,13 @@ VideoClass::VideoClass(const std::string& path, PacketLoad* packet, ErrorHandler
 	// Fill the load map
 	{
 		std::lock_guard<std::mutex> lock(mutex);
+		loadStreamMap.emplace(AVMediaType::AVMEDIA_TYPE_VIDEO, [this](AVStream* stream, int streamIndex)
+		{
+			StreamFrameSettings frameSettings{ std::format("{}/.cache/{}", this->path, settings.name), settings.frameFormat, stream, streamIndex, settings.width, settings.height, settings.fps };
+			auto s = std::make_unique<StreamVideo>(frameSettings, errorHandler);
+			s->receiveFrame(stuff.formatContext);
+			return std::move(s);
+		});
 		loadStreamMap.emplace(AVMediaType::AVMEDIA_TYPE_AUDIO, [this](AVStream* stream, int streamIndex) 
 		{
 			StreamAudioSettings audioSettings{ std::format("{}/.cache/{}", this->path, settings.name), settings.audioFormat, stream, streamIndex, settings.audioSampleRate, settings.audioChannels, settings.audioQuality };
