@@ -16,14 +16,17 @@ struct PacketLoad : public IPacket
 {
 	std::string path;
 
+	// File formats
 	std::string frameFormat = ".jpg";
 	std::string audioFormat = ".wav";
 	std::string videoFormat = ".mp4";
 
+	// Video settings
 	uint16_t width = 1920u;
 	uint16_t height = 1080u;
 	float fps = 60.f;
 
+	// Audio settings
 	uint32_t audioSampleRate = 44100u;
 	uint16_t audioChannels = 2u;
 	int8_t audioQuality = 6u; // Apply only for .ogg audio
