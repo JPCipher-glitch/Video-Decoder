@@ -5,21 +5,30 @@
 #include "video/video_packets.hpp"
 #include "error_handler.hpp"
 
-#include <unordered_map>
+#include <atomic>
+#include <thread>
 #include <mutex>
-#include <string>
 #include <functional>
+#include <unordered_map>
+#include <string>
 
 class VideoClass final
 {
 private:
 	std::mutex mutex;
 
+	std::jthread loadingTask;
+	std::atomic<bool> isLoaded = false;
+	std::atomic<bool> isLoading = false;
+
 	std::string path;
 	PacketLoad settings;
 	VideoStuff stuff;
 	ErrorHandler& errorHandler;
 
+	double streamTimeStart = 0.0;
+
+	bool islog = false;
 	bool initialized = false;
 	bool valid = true;
 
@@ -27,6 +36,7 @@ private:
 
 	void createCacheFolder();
 
+	void loadAssets();
 	void loadContext();
 	void loadStreams();
 	void displayInfo();

@@ -26,7 +26,10 @@ void ClientStuff::read(std::weak_ptr<Command> c)
                 {
                     // Create the packet and send it to the video manager
                     std::unique_ptr<IPacket> packet = command->receivePacket(stream);
-                    command->notify(packet.get());
+                    {
+                        std::lock_guard<std::mutex> lock(command->packetMutex);
+                        command->packetQueue.push(std::move(packet));
+                    }
                 }
 
                 read(command);
@@ -163,15 +166,27 @@ void Command::notify(IPacket* packet)
 void Command::update()
 {
     // Remove the clients when they are deconnected
-    std::unique_lock lock(mutex);
-    for (auto client = clientList.begin(); client != clientList.end();)
     {
-        if ((*client)->toRemove)
+        std::unique_lock lock(mutex);
+        for (auto client = clientList.begin(); client != clientList.end();)
         {
-            client = clientList.erase(client); 
-            continue;
+            if ((*client)->toRemove)
+            {
+                client = clientList.erase(client);
+                continue;
+            }
+            client++;
         }
-        client++;
+    }
+
+	// Send the packet to the observers
+    {
+        std::lock_guard<std::mutex> lock(packetMutex);
+        while (!packetQueue.empty())
+        {
+            notify(packetQueue.front().get());
+            packetQueue.pop();
+        }
     }
 }
 #pragma endregion

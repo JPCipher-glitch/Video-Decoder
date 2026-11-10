@@ -84,11 +84,11 @@ void StreamVideo::loadSwsContext()
         decoderContext->height,
         decoderContext->pix_fmt,
 
-        settings.width,
-        settings.height,
+        encoderContext->width,
+        encoderContext->height,
         AV_PIX_FMT_RGB24,
 
-        SWS_BILINEAR,
+        SWS_POINT,
         nullptr,
         nullptr,
         nullptr
@@ -105,7 +105,12 @@ void StreamVideo::createExportFrame()
     exportFrame->format = AV_PIX_FMT_RGB24;
     exportFrame->width = encoderContext->width;
     exportFrame->height = encoderContext->height;
-    av_frame_get_buffer(exportFrame, 0);
+    if (av_frame_get_buffer(exportFrame, 0) < 0)
+    {
+        invalid = true;
+        errorHandler.showError(L"Cannot allocate export frame buffer", false);
+        return;
+    }
 }
 #pragma endregion
 
@@ -177,12 +182,9 @@ void StreamVideo::receiveFrame(AVFormatContext*& formatContext)
     // Decode frames
     while (av_read_frame(formatContext, sendPacket) >= 0)
     {
-        if (!writeFrame(formatContext))
+        if (!writeFrame(formatContext) || frameIndex >= 10)
             break;
     }
-
-    // Close the subs file to complete it
-    closeFile();
 }
 #pragma endregion
 
@@ -205,7 +207,7 @@ void StreamVideo::saveAsFile()
     );
 
     // Create the frame packet
-    int result = avcodec_send_frame(encoderContext, frame);
+    int result = avcodec_send_frame(encoderContext, exportFrame);
     if (result >= 0)
         result = avcodec_receive_packet(encoderContext, receivePacket);
     else

@@ -20,6 +20,8 @@ StreamSubtitles::StreamSubtitles(StreamSubSettings s, ErrorHandler& errorHandler
 #pragma region DESTRUCTOR
 StreamSubtitles::~StreamSubtitles()
 {
+    // Close file
+    closeFile();
     // Remove the cache directory
     fs::path dirPath = std::format("{}/subtitles", path);
     if (fs::exists(dirPath) && fs::is_directory(dirPath))

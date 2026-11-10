@@ -49,6 +49,8 @@ public:
 	~Command();
 
 	ErrorHandler& errorHandler;
+	std::queue<std::unique_ptr<IPacket>> packetQueue;
+	std::mutex packetMutex;
 
 	bool isRunning() { return running; };
 
