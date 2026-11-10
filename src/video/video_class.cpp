@@ -115,6 +115,22 @@ void VideoClass::createCacheFolder()
 }
 #pragma endregion
 
+#pragma region TASK LIFETIME
+void VideoClass::requestStop()
+{
+	// Stop the loading task if it's still running
+	loadingTask.request_stop();
+}
+
+void VideoClass::join()
+{
+	// Wait for the loading task to finish
+	if (loadingTask.joinable())
+		loadingTask.join();
+}
+#pragma endregion
+
+
 #pragma region CONSTRUCTOR
 VideoClass::VideoClass(const std::string& path, PacketLoad* packet, ErrorHandler& handler) : path{ path }, settings{ *packet }, errorHandler{ handler }
 {
@@ -150,12 +166,10 @@ VideoClass::VideoClass(const std::string& path, PacketLoad* packet, ErrorHandler
 #pragma region DESTRUCTOR
 VideoClass::~VideoClass()
 {
-	loadingTask.request_stop();
-
 	// Remove the cache directory
-	fs::path dirPath = std::format("{}/.cache/{}", path, settings.name);
+	/*fs::path dirPath = std::format("{}/.cache/{}", path, settings.name);
 	if (fs::exists(dirPath) && fs::is_directory(dirPath))
-		fs::remove_all(dirPath);
+		fs::remove_all(dirPath);*/
 	avformat_close_input(&stuff.formatContext);
 }
 #pragma endregion

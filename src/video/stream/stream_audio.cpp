@@ -521,10 +521,14 @@ void StreamAudio::saveAsFile()
 #pragma region CLOSE FILE
 void StreamAudio::closeFile()
 {
+    if (isFileClosed) return;
+
     if (settings.format == ".wav")
         closeWavFile();
     else if (settings.format == ".ogg")
         closeOggFile();
+
+	isFileClosed = true;
 }
 #pragma endregion
 #pragma endregion

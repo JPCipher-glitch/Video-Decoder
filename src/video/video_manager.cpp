@@ -50,7 +50,21 @@ VideoManager::VideoManager(const std::string& path, Lifetime& lifetime, ErrorHan
 #pragma region DESTRUCTOR
 VideoManager::~VideoManager()
 {
+	// Request stop for every VideoClass
+	for (auto& video : videoMap)
+		video.second->requestStop();
+
+	// Wait for every loading thread
+	for (auto& video : videoMap)
+		video.second->join();
+
+	// Clear the video map
 	videoMap.clear();
+
+	// Remove the cache directory
+	fs::path dirPath = std::format("{}/.cache", path);
+	if (fs::exists(dirPath) && fs::is_directory(dirPath))
+		fs::remove_all(dirPath);
 }
 #pragma endregion
 

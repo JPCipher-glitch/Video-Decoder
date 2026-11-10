@@ -58,16 +58,16 @@ Engine::Engine(const std::string& p) : path(p), videoManager(path, lifetime, err
 	command->run();
 	command->attach(&videoManager);
 
+	// Wait a little bit to make sure the server is running before creating the debug client
+	std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
 	// Create debug client
 	debug.run();
 }
 
 Engine::~Engine()
 {
-	// Remove the cache directory
-	fs::path dirPath = std::format("{}/.cache", path);
-	if (fs::exists(dirPath) && fs::is_directory(dirPath))
-		fs::remove_all(dirPath);
+	
 }
 
 void Engine::run()

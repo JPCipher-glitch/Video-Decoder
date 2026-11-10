@@ -46,6 +46,8 @@ public:
 	~VideoClass();
 
 	bool isValid();
+	void requestStop();
+	void join();
 
 	void load();
 	void update();
