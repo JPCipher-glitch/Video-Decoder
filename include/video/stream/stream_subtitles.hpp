@@ -29,7 +29,7 @@ private:
 	std::string extractText();
 	std::string formatTimestamp(int64_t milliseconds);
 public:
-	StreamSubtitles(StreamSubSettings settings, ErrorHandler& errorHandler);
+	StreamSubtitles(StreamSubSettings settings, ErrorHandler& errorHandler, VideoLifetime& videoLifetime);
 	~StreamSubtitles() override;
 
 	void loadDecoder() override;

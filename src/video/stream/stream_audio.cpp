@@ -6,7 +6,7 @@
 namespace fs = std::filesystem;
 
 #pragma region CONSTRUCTOR
-StreamAudio::StreamAudio(StreamAudioSettings s, ErrorHandler& errorHandler) : settings{ s }, IVidStream{ errorHandler, s.path, s.stream, s.streamIndex }
+StreamAudio::StreamAudio(StreamAudioSettings s, ErrorHandler& errorHandler, VideoLifetime& videoLifetime) : settings{ s }, IVidStream{ errorHandler, videoLifetime, s.path, s.stream, s.streamIndex }
 {
     createAudioCache();
     loadDecoder();
@@ -42,10 +42,6 @@ StreamAudio::~StreamAudio()
 {
     // Close file
     closeFile();
-    // Remove the cache directory
-    fs::path dirPath = std::format("{}/audio", path);
-    if (fs::exists(dirPath) && fs::is_directory(dirPath))
-        fs::remove_all(dirPath);
 
     // Cleanup
     av_frame_free(&frame);
@@ -274,7 +270,7 @@ void StreamAudio::receiveFrame(AVFormatContext*& formatContext)
     avcodec_flush_buffers(decoderContext); // Wipe the last buffers before reading another sample
 
     // Decode frames
-    while (av_read_frame(formatContext, sendPacket) >= 0)
+    while (av_read_frame(formatContext, sendPacket) >= 0 && !videoLifetime.isDone)
     {
         // Get the audio stream
         if (sendPacket->stream_index == streamIndex)
@@ -283,7 +279,7 @@ void StreamAudio::receiveFrame(AVFormatContext*& formatContext)
             avcodec_send_packet(decoderContext, sendPacket);
 
             // Receive decoded frames
-            while (true)
+            while (!videoLifetime.isDone)
             {
                 // Receive the decoded data frame
                 int result = avcodec_receive_frame(decoderContext, frame);

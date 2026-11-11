@@ -36,7 +36,7 @@ private:
 	bool writeFrame(AVFormatContext*& formatContext);
 	std::filesystem::path getFilePath(const std::string& format);
 public:
-	StreamVideo(StreamFrameSettings settings, ErrorHandler& errorHandler);
+	StreamVideo(StreamFrameSettings settings, ErrorHandler& errorHandler, VideoLifetime& videoLifetime);
 	~StreamVideo() override;
 
 	void loadDecoder() override;

@@ -11,11 +11,6 @@
 
 namespace fs = std::filesystem;
 
-#pragma region CONSTRUCTOR
-VideoClass::VideoClass(ErrorHandler& errorHandler) : errorHandler{ errorHandler } {}
-#pragma endregion
-
-
 #pragma region ASSETS
 void VideoClass::loadAssets()
 {
@@ -120,6 +115,7 @@ void VideoClass::requestStop()
 {
 	// Stop the loading task if it's still running
 	loadingTask.request_stop();
+	videoLifetime.isDone = true;
 }
 
 void VideoClass::join()
@@ -138,19 +134,19 @@ VideoClass::VideoClass(const std::string& path, PacketLoad* packet, ErrorHandler
 	loadStreamMap.emplace(AVMediaType::AVMEDIA_TYPE_VIDEO, [this](AVStream* stream, int streamIndex)
 	{
 		StreamFrameSettings frameSettings{ std::format("{}/.cache/{}", this->path, settings.name), settings.frameFormat, stream, streamIndex, settings.width, settings.height, settings.fps };
-		auto s = std::make_unique<StreamVideo>(frameSettings, errorHandler);
+		auto s = std::make_unique<StreamVideo>(frameSettings, errorHandler, videoLifetime);
 		return std::move(s);
 	});
 	loadStreamMap.emplace(AVMediaType::AVMEDIA_TYPE_AUDIO, [this](AVStream* stream, int streamIndex) 
 	{
 		StreamAudioSettings audioSettings{ std::format("{}/.cache/{}", this->path, settings.name), settings.audioFormat, stream, streamIndex, settings.audioSampleRate, settings.audioChannels, settings.audioQuality };
-		auto s = std::make_unique<StreamAudio>(audioSettings, errorHandler);
+		auto s = std::make_unique<StreamAudio>(audioSettings, errorHandler, videoLifetime);
 		return std::move(s);
 	});
 	loadStreamMap.emplace(AVMediaType::AVMEDIA_TYPE_SUBTITLE, [this](AVStream* stream, int streamIndex)
 	{
 		StreamSubSettings subSettings{ std::format("{}/.cache/{}", this->path, settings.name), stream, streamIndex };
-		auto s = std::make_unique<StreamSubtitles>(subSettings, errorHandler);
+		auto s = std::make_unique<StreamSubtitles>(subSettings, errorHandler, videoLifetime);
 		return std::move(s);
 	});
 

@@ -62,7 +62,7 @@ private:
 	void encodeCompleteFrames();
 	void closeFile();
 public:
-	StreamAudio(StreamAudioSettings settings, ErrorHandler& errorHandler);
+	StreamAudio(StreamAudioSettings settings, ErrorHandler& errorHandler, VideoLifetime& videoLifetime);
 	~StreamAudio() override;
 
 	void createWavAudioWriter();

@@ -6,7 +6,7 @@
 namespace fs = std::filesystem;
 
 #pragma region CONSTRUCTOR
-StreamVideo::StreamVideo(StreamFrameSettings s, ErrorHandler& errorHandler) : settings{ s }, IVidStream{ errorHandler, s.path, s.stream, s.streamIndex }
+StreamVideo::StreamVideo(StreamFrameSettings s, ErrorHandler& errorHandler, VideoLifetime& videoLifetime) : settings{ s }, IVidStream{ errorHandler, videoLifetime, s.path, s.stream, s.streamIndex }
 {
     createFramesCache();
     loadDecoder();
@@ -20,11 +20,6 @@ StreamVideo::StreamVideo(StreamFrameSettings s, ErrorHandler& errorHandler) : se
 #pragma region DESTRUCTOR
 StreamVideo::~StreamVideo()
 {
-    // Remove the cache directory
-    fs::path dirPath = std::format("{}/frames", path);
-    if (fs::exists(dirPath) && fs::is_directory(dirPath))
-        fs::remove_all(dirPath);
-
     // Cleanup
     av_frame_free(&frame);
     av_packet_free(&sendPacket);
@@ -154,7 +149,7 @@ bool StreamVideo::writeFrame(AVFormatContext*& formatContext)
         avcodec_send_packet(decoderContext, sendPacket);
 
         // Receive decoded frames
-        while (true)
+        while (!videoLifetime.isDone)
         {
             // Receive the decoded data frame
             int result = avcodec_receive_frame(decoderContext, frame);
@@ -180,7 +175,7 @@ void StreamVideo::receiveFrame(AVFormatContext*& formatContext)
     avcodec_flush_buffers(decoderContext); // Wipe the last buffers before reading another sample
 
     // Decode frames
-    while (av_read_frame(formatContext, sendPacket) >= 0)
+    while (av_read_frame(formatContext, sendPacket) >= 0 && !videoLifetime.isDone)
     {
         if (!writeFrame(formatContext) || frameIndex >= 10)
             break;

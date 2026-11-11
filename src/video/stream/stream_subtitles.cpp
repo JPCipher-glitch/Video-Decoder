@@ -8,7 +8,7 @@ namespace fs = std::filesystem;
 void StreamSubtitles::loadEncoder() {}
 
 #pragma region CONSTRUCTOR
-StreamSubtitles::StreamSubtitles(StreamSubSettings s, ErrorHandler& errorHandler) : settings{ s }, IVidStream{ errorHandler, s.path, s.stream, s.streamIndex }
+StreamSubtitles::StreamSubtitles(StreamSubSettings s, ErrorHandler& errorHandler, VideoLifetime& videoLifetime) : settings{ s }, IVidStream{ errorHandler, videoLifetime, s.path, s.stream, s.streamIndex }
 {
     createSubsCache();
     loadDecoder();
@@ -22,10 +22,18 @@ StreamSubtitles::~StreamSubtitles()
 {
     // Close file
     closeFile();
-    // Remove the cache directory
-    fs::path dirPath = std::format("{}/subtitles", path);
-    if (fs::exists(dirPath) && fs::is_directory(dirPath))
-        fs::remove_all(dirPath);
+
+    //try
+    //{
+    //    // Remove the cache directory
+    //    fs::path dirPath = std::format("{}/subtitles", path);
+    //    if (fs::exists(dirPath) && fs::is_directory(dirPath))
+    //        fs::remove_all(dirPath);
+    //}
+    //catch (const std::filesystem::filesystem_error& e)
+    //{
+    //    std::cerr << "ERROR: " << e.what() << std::endl;
+    //}
 
     // Cleanup
     av_frame_free(&frame);
@@ -128,7 +136,7 @@ void StreamSubtitles::receiveFrame(AVFormatContext*& formatContext)
     avcodec_flush_buffers(decoderContext); // Wipe the last buffers before reading another sample
 
     // Decode frames
-    while (av_read_frame(formatContext, sendPacket) >= 0)
+    while (av_read_frame(formatContext, sendPacket) >= 0 && !videoLifetime.isDone)
     {
         if (!writeFrame(formatContext))
             break;
@@ -286,6 +294,8 @@ void StreamSubtitles::saveAsFile()
 #pragma region CLOSE FILE
 void StreamSubtitles::closeFile()
 {
+    if (!outputFile.is_open()) return;
+
 	// Flush the decoder to get the last subs
     AVPacket flushPacket{};
     writeFrame(formatContext);

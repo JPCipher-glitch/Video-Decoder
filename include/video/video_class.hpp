@@ -3,6 +3,7 @@
 
 #include "video/video_stuff.hpp"
 #include "video/video_packets.hpp"
+#include "video/video_lifetime.hpp"
 #include "error_handler.hpp"
 
 #include <atomic>
@@ -24,6 +25,7 @@ private:
 	std::string path;
 	PacketLoad settings;
 	VideoStuff stuff;
+	VideoLifetime videoLifetime;
 	ErrorHandler& errorHandler;
 
 	double streamTimeStart = 0.0;
@@ -41,7 +43,6 @@ private:
 	void loadStreams();
 	void displayInfo();
 public:
-	VideoClass(ErrorHandler& errorHandler);
 	VideoClass(const std::string& path, PacketLoad* packet, ErrorHandler& errorHandler);
 	~VideoClass();
 
