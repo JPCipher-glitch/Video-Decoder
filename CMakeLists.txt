@@ -73,5 +73,4 @@
 
 # Include the FFMPEG, Winsock, Asio libs
     target_link_libraries(${PROJECT_NAME} PRIVATE ${FFMPEG_LIBRARIES})
-    target_link_libraries(${PROJECT_NAME} PRIVATE Ws2_32)
     target_link_libraries(${PROJECT_NAME} PUBLIC asio::asio)

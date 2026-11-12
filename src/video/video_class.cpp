@@ -18,6 +18,9 @@ void VideoClass::loadAssets()
 	if (isLoading.exchange(true))
 		return;
 
+	// Create the loading widget
+	loadingWidget = std::make_unique<LoadingWidget>();
+
 	isLoading = true; // Set the loading state to true
 	streamTimeStart = std::chrono::duration<float>(std::chrono::steady_clock::now().time_since_epoch()).count();
 

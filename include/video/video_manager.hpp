@@ -3,6 +3,7 @@
 
 #include "observer.hpp"
 #include "video/video_class.hpp"
+
 #include "serializer/command_type.hpp"
 #include "error_handler.hpp"
 
@@ -12,6 +13,7 @@
 
 class Lifetime;
 struct IPacket;
+class LoadingHandler;
 
 class VideoManager : public IObserver
 {

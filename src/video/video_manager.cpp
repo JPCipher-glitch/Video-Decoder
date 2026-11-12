@@ -1,6 +1,6 @@
 #include "video/video_manager.hpp"
-#include "video/video_packets.hpp"
 #include "video/video_class.hpp"
+#include "video/video_packets.hpp"
 
 #include "lifetime.hpp"
 #include <iostream>

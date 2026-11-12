@@ -2,6 +2,7 @@
 #define ENGINE_HPP
 
 #include "video/video_manager.hpp"
+#include "video/loading/loading_handler.hpp"
 #include "command.hpp"
 #include "lifetime.hpp"
 #include "debug.hpp"
@@ -19,6 +20,7 @@ private:
 	Lifetime lifetime;
 	Debug debug;
 	ErrorHandler errorHandler;
+	LoadingHandler loadingHandler;
 
 	void createCache(const std::string& path);
 	bool setDirectoryHidden(const std::filesystem::path& path);

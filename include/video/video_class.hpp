@@ -4,6 +4,7 @@
 #include "video/video_stuff.hpp"
 #include "video/video_packets.hpp"
 #include "video/video_lifetime.hpp"
+#include "video/loading/loading_widget.hpp"
 #include "error_handler.hpp"
 
 #include <atomic>
@@ -12,6 +13,8 @@
 #include <functional>
 #include <unordered_map>
 #include <string>
+
+class LoadingHandler;
 
 class VideoClass final
 {
@@ -27,6 +30,8 @@ private:
 	VideoStuff stuff;
 	VideoLifetime videoLifetime;
 	ErrorHandler& errorHandler;
+	
+	std::unique_ptr<LoadingWidget> loadingWidget;
 
 	double streamTimeStart = 0.0;
 
