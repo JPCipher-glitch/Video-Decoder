@@ -1,7 +1,7 @@
 ﻿#include "engine.hpp"
 #include "video/video_manager.hpp"
-#include "Windows.h"
 
+#include <QApplication>
 #include <format>
 
 namespace fs = std::filesystem;
@@ -34,14 +34,15 @@ Engine::Engine(const std::string& p) : path(p), videoManager(path, lifetime, err
 {
 	// Set the cache path
 	if (path.length() <= 0)
-		path = "resources";
+		path = "placeholders";
 
 	// Check if the folder exist to making the cache, else shutdown the engine
 	fs::path cacheDirectory = path;
 	if (!fs::exists(cacheDirectory))
 	{
-		std::wstring message = std::format(L"This folder is not valid for saving the video cache:\n\"{}\"", errorHandler.toWString(path));
+		std::string message = std::format("This folder is not valid for saving the video cache:\n\"{}\"\nThe engine will shutdown now.", path);
 		errorHandler.showError(message, true);
+		errorHandler.update();
 		lifetime.destroy();
 		return;
 	}
@@ -67,15 +68,18 @@ Engine::Engine(const std::string& p) : path(p), videoManager(path, lifetime, err
 
 Engine::~Engine()
 {
-	
+	QApplication::closeAllWindows(); // Close all the QT widgets
 }
 
 void Engine::run()
 {
 	while (lifetime.isAlive())
 	{
+		QApplication::processEvents(); // Process the QT events into the loop
+
 		videoManager.update();
 		command->update();
 		lifetime.update();
+		errorHandler.update();
 	}
 }

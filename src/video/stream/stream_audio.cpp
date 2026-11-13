@@ -26,7 +26,7 @@ StreamAudio::StreamAudio(StreamAudioSettings s, ErrorHandler& errorHandler, Vide
         // Set OGG by default if the audio format is not valid
         if (s.format != ".ogg")
         {
-            errorHandler.showWarning(std::format(L"The audio format \"{}\" is invalid.\nThe format\".ogg\" is now set by default for the audio format", errorHandler.toWString(s.format)), false);
+            errorHandler.showWarning(std::format("The audio format \"{}\" is invalid.\nThe format\".ogg\" is now set by default for the audio format", s.format), false);
             settings.format = ".ogg";
         }
         loadEncoder(); // Configure the audio settings
@@ -69,7 +69,7 @@ void StreamAudio::loadDecoder()
     if (avcodec_open2(decoderContext, decoder, nullptr) < 0)
     {
         invalid = true;
-        errorHandler.showError(L"Cannot open audio decoder", false);
+        errorHandler.showError("Cannot open audio decoder", false);
         return;
     }
 }
@@ -108,7 +108,7 @@ void StreamAudio::createWavAudioWriter()
         outputLayoutIndex = static_cast<int>(settings.channels) - 1;
     else
     {
-        errorHandler.showError(std::format(L"The number of channels for the audio is invalid: {}", settings.channels), false);
+        errorHandler.showError(std::format("The number of channels for the audio is invalid: {}", settings.channels), false);
         invalid = true;
     }
 }
@@ -144,7 +144,7 @@ void StreamAudio::loadEncoder()
     if (encoder == nullptr)
     {
         invalid = true;
-        errorHandler.showError(L"The Vorbis encoder was not found", false);
+        errorHandler.showError("The Vorbis encoder was not found", false);
         return;
     }
 
@@ -167,7 +167,7 @@ void StreamAudio::loadEncoder()
     if (avcodec_open2(encoderContext, encoder, nullptr) < 0)
     {
         invalid = true;
-        errorHandler.showError(L"Cannot open audio encoder", false);
+        errorHandler.showError("Cannot open audio encoder", false);
         return;
     }
 
@@ -177,7 +177,7 @@ void StreamAudio::loadEncoder()
     if (audioFifo == nullptr)
     {
         invalid = true;
-        errorHandler.showError(L"Cannot allocate audio FIFO", false);
+        errorHandler.showError("Cannot allocate audio FIFO", false);
         return;
     }
 }
@@ -193,7 +193,7 @@ void StreamAudio::loadFormatContext()
     if (result < 0)
     {
         invalid = true;
-        errorHandler.showError(L"Cannot allocate OGG format context", false);
+        errorHandler.showError("Cannot allocate OGG format context", false);
         return;
     }
 
@@ -202,7 +202,7 @@ void StreamAudio::loadFormatContext()
     if (result < 0)
     {
         invalid = true;
-        errorHandler.showError(L"Cannot open OGG file", false);
+        errorHandler.showError("Cannot open OGG file", false);
         return;
     }
 }
@@ -215,7 +215,7 @@ void StreamAudio::createAudioStream()
     if (outputStream == nullptr)
     {
         invalid = true;
-        errorHandler.showError(L"Cannot create audio stream", false);
+        errorHandler.showError("Cannot create audio stream", false);
         return;
     }
 
@@ -367,7 +367,7 @@ void StreamAudio::writeEncodedPackets()
         if (av_interleaved_write_frame(formatContext, receivePacket) < 0)
         {
             invalid = true;
-            errorHandler.showError(L"Cannot write OGG packet", false);
+            errorHandler.showError("Cannot write OGG packet", false);
             return;
         }
 
@@ -386,7 +386,7 @@ void StreamAudio::encodeCompleteFrames()
     if (av_frame_get_buffer(convertedFrame, 0) < 0)
     {
         invalid = true;
-        errorHandler.showError(L"Cannot allocate Vorbis frame", false);
+        errorHandler.showError("Cannot allocate Vorbis frame", false);
         return;
     }
 
@@ -394,7 +394,7 @@ void StreamAudio::encodeCompleteFrames()
     if (av_audio_fifo_read(audioFifo, reinterpret_cast<void**>(convertedFrame->extended_data), encoderContext->frame_size) != encoderContext->frame_size)
     {
         invalid = true;
-        errorHandler.showError(L"Cannot read samples from audio FIFO", false);
+        errorHandler.showError("Cannot read samples from audio FIFO", false);
         return;
     }
 
@@ -413,7 +413,7 @@ void StreamAudio::encodeCompleteFrames()
     if (result < 0)
     {
         invalid = true;
-        errorHandler.showError(L"Failed to send frame to Vorbis encoder", false);
+        errorHandler.showError("Failed to send frame to Vorbis encoder", false);
         return;
     }
 
@@ -439,7 +439,7 @@ void StreamAudio::saveOggFile()
     if (av_frame_get_buffer(convertedFrame, 0) < 0)
     {
         invalid = true;
-        errorHandler.showError(L"Cannot allocate OGG audio buffer", false);
+        errorHandler.showError("Cannot allocate OGG audio buffer", false);
         return;
     }
 
@@ -455,7 +455,7 @@ void StreamAudio::saveOggFile()
     if (samples < 0)
     {
         invalid = true;
-        errorHandler.showError(L"Cannot convert audio samples", false);
+        errorHandler.showError("Cannot convert audio samples", false);
         return;
     }
 
@@ -469,14 +469,14 @@ void StreamAudio::saveOggFile()
     if (av_audio_fifo_realloc(audioFifo, av_audio_fifo_size(audioFifo) + samples) < 0)
     {
         invalid = true;
-        errorHandler.showError(L"Cannot resize audio FIFO", false);
+        errorHandler.showError("Cannot resize audio FIFO", false);
         return;
     }
 
     if (av_audio_fifo_write(audioFifo, reinterpret_cast<void**>(convertedFrame->extended_data), samples) < samples)
     {
         invalid = true;
-        errorHandler.showError(L"Cannot write samples into audio FIFO", false);
+        errorHandler.showError("Cannot write samples into audio FIFO", false);
         return;
     }
 

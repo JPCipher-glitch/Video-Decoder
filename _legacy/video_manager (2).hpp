@@ -20,7 +20,7 @@ private:
 	Lifetime* lifetime = nullptr;
 
 	// Video Settings
-	const std::string path = "resources";
+	const std::string path = "placeholders";
 	const std::string name = "ducktales";
 	const std::string ext = "mp4";
 

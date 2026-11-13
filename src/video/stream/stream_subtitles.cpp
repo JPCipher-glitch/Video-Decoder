@@ -57,7 +57,7 @@ void StreamSubtitles::loadDecoder()
     if (avcodec_open2(decoderContext, decoder, nullptr) < 0)
     {
         invalid = true;
-        errorHandler.showError(L"Cannot open audio decoder", false);
+        errorHandler.showError("Cannot open audio decoder", false);
         return;
     }
 }

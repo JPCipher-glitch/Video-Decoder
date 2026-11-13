@@ -19,7 +19,7 @@ void VideoManager::loadVideo(IPacket* packet)
 	}
 	else
 	{
-		errorHandler.showWarning(std::format(L"This video was already loaded\nor have the same name with another one:\n\"{}\"", errorHandler.toWString(packet->name)), false);
+		errorHandler.showWarning(std::format("This video was already loaded\nor have the same name with another one:\n\"{}\"", packet->name), false);
 		std::cout << std::format("ERROR: VIDEO ALREADY LOADED: {}\n", packet->name);
 	}
 }

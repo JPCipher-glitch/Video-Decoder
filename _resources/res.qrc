@@ -1,0 +1,6 @@
+<RCC>
+	<qresource prefix="icons">
+		<file alias="desk_icon">desk_icons/clapperboard_icon.png</file>
+		<file alias="desk_icon_border">desk_icons/clapperboard_icon_border.png</file>
+	</qresource>
+</RCC>

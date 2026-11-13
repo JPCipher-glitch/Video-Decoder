@@ -26,7 +26,7 @@ Debug::Debug(Lifetime& lifetime, ErrorHandler& errorHandler) : lifetime(lifetime
         {
             PacketLoad* packet = dynamic_cast<PacketLoad*>(p);
             stream >> std::quoted(packet->path);
-            packet->path = packet->path.empty() ? "resources/ducktales" : packet->path;
+            packet->path = packet->path.empty() ? "placeholders/ducktales" : packet->path;
         });
     commandMap.emplace("--video-format", [this](std::stringstream& stream, IPacket* p)
         {
@@ -88,14 +88,14 @@ void Debug::loadVideo(Serializer& s, std::stringstream& ss)
         if (commandMap.contains(command))
             commandMap[command](ss, &packet);
         else
-            errorHandler.showWarning(std::format(L"This sub-command name is invalid: {}", errorHandler.toWString(command)), false);
+            errorHandler.showWarning(std::format("This sub-command name is invalid: {}", command), false);
     }
 
     ss >> std::quoted(packet.name) >> std::quoted(packet.path);
 
     // Make sure the name & the path is not invalid
     packet.name = packet.name.empty() ? "Dewey & Della - Singing" : packet.name;
-    packet.path = packet.path.empty() ? "resources/ducktales" : packet.path;
+    packet.path = packet.path.empty() ? "placeholders/ducktales" : packet.path;
 
     s.write(COMMAND_TYPE::LOAD);
     s.write(packet.timePoint);
@@ -154,7 +154,7 @@ void Debug::handlerTask(std::stop_token stopToken)
                 sendPacket(command, ss);
             else
             {
-                errorHandler.showWarning(std::format(L"This command name is invalid: {}", errorHandler.toWString(command)), false);
+                errorHandler.showWarning(std::format("This command name is invalid: {}", command), false);
                 std::cerr << "INVALID COMMAND: " << command << std::endl;
             }
         }

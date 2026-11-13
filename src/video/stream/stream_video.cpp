@@ -43,7 +43,7 @@ void StreamVideo::loadDecoder()
     if (avcodec_open2(decoderContext, decoder, nullptr) < 0)
     {
         invalid = true;
-        errorHandler.showError(L"Cannot open video decoder", false);
+        errorHandler.showError("Cannot open video decoder", false);
         return;
     }
 }
@@ -103,7 +103,7 @@ void StreamVideo::createExportFrame()
     if (av_frame_get_buffer(exportFrame, 0) < 0)
     {
         invalid = true;
-        errorHandler.showError(L"Cannot allocate export frame buffer", false);
+        errorHandler.showError("Cannot allocate export frame buffer", false);
         return;
     }
 }

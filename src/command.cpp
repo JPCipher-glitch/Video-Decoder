@@ -38,7 +38,7 @@ void ClientStuff::read(std::weak_ptr<Command> c)
             {
                 if (error != asio::error::eof) // There is a problem with the client
                 {
-                    command->errorHandler.showError(command->errorHandler.toWString(error.message()), false);
+                    command->errorHandler.showError(error.message(), false);
                     std::cout << "ERROR: " << error.message() << std::endl;
                 }
                 else // The client disconnected safely

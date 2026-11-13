@@ -8,7 +8,8 @@
     set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Resources Files
-    file(COPY ${CMAKE_SOURCE_DIR}/resources DESTINATION ${CMAKE_BINARY_DIR})
+    file(COPY ${CMAKE_SOURCE_DIR}/placeholders DESTINATION ${CMAKE_BINARY_DIR})
+    file(COPY ${CMAKE_SOURCE_DIR}/_resources DESTINATION ${CMAKE_BINARY_DIR})
 
 # Install CPM
     set(CPM_USE_LOCAL_PACKAGES ON)
@@ -41,8 +42,16 @@
         GIT_TAG "main"
     )
 
-# FFMPEG package
+# Packages
     find_package(FFMPEG REQUIRED)
+    find_package(Qt6 REQUIRED COMPONENTS Core Widgets Gui Network)
+
+# QT Setup
+    qt_standard_project_setup()
+
+    set(CMAKE_AUTOMOC ON)
+    set(CMAKE_AUTOUIC ON)
+    set(CMAKE_AUTORCC ON)
 
 # Sources
     file(GLOB_RECURSE SRCS 
@@ -53,13 +62,13 @@
     )
 
 # Executable
-    add_executable(${PROJECT_NAME} src/main.cpp)
+    qt_add_executable(${PROJECT_NAME} src/main.cpp ${CMAKE_SOURCE_DIR}/_resources/res.qrc)
 
 # Configuration into the last version of the C++
     target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_23)
 
 # Target the file sources
-    target_sources(${PROJECT_NAME} PRIVATE ${SRCS})
+    target_sources(${PROJECT_NAME} PRIVATE ${SRCS} _resources/icon.rc)
 
 # Target the directories
     target_include_directories(${PROJECT_NAME} PRIVATE 
@@ -73,4 +82,22 @@
 
 # Include the FFMPEG, Winsock, Asio libs
     target_link_libraries(${PROJECT_NAME} PRIVATE ${FFMPEG_LIBRARIES})
+    target_link_libraries(${PROJECT_NAME} PRIVATE Qt6::Core Qt6::Widgets Qt6::Gui Qt6::Network)
     target_link_libraries(${PROJECT_NAME} PUBLIC asio::asio)
+
+# Deploy Qt for Windows
+    if(WIN32)
+        add_custom_command(
+            TARGET ${PROJECT_NAME} POST_BUILD
+            COMMAND Qt6::windeployqt
+            ARGS
+                --no-translations
+                --no-system-d3d-compiler
+                $<TARGET_FILE:${PROJECT_NAME}>
+            COMMENT "Deploying Qt plugins (platforms, styles, imageformats...)"
+        )
+    endif()
+
+if (CMAKE_VERSION VERSION_GREATER 3.12)
+  set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 23)
+endif()

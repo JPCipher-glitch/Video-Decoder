@@ -19,7 +19,7 @@ void VideoClass::loadAssets()
 		return;
 
 	// Create the loading widget
-	loadingWidget = std::make_unique<LoadingWidget>();
+	//loadingWidget = std::make_unique<LoadingWidget>();
 
 	isLoading = true; // Set the loading state to true
 	streamTimeStart = std::chrono::duration<float>(std::chrono::steady_clock::now().time_since_epoch()).count();
@@ -49,7 +49,7 @@ void VideoClass::loadContext()
 	if (avformat_open_input(&stuff.formatContext, std::format("{}{}", settings.path, settings.videoFormat).c_str(), nullptr, nullptr) < 0)
 	{
 		valid = false;
-		errorHandler.showError(std::format(L"The following video was not found in this path:\n\"{}{}\"", errorHandler.toWString(settings.path), errorHandler.toWString(settings.videoFormat)), false);
+		errorHandler.showError(std::format("The following video was not found in this path:\n\"{}{}\"", settings.path, settings.videoFormat), false);
 		std::cerr << std::format("ERROR: Invalid video path: {}{}\n", settings.path, settings.videoFormat);
 	}
 }
@@ -107,7 +107,7 @@ void VideoClass::createCacheFolder()
 		catch (const std::filesystem::filesystem_error& e)
 		{
 			valid = false;
-			errorHandler.showError(std::format(L"Failed to create the cache directory \"{}\"", errorHandler.toWString(videoDirectory.string())), false);
+			errorHandler.showError(std::format("Failed to create the cache directory \"{}\"", videoDirectory.string()), false);
 		}
 	}
 }

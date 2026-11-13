@@ -1,34 +1,46 @@
 #ifndef ERROR_HANDLER_HPP
 #define ERROR_HANDLER_HPP
 
-#include <future>
-#include <string>
-#include <unordered_set>
+#include <QObject>
+#include <QMessageBox>
+#include <mutex>
 #include <queue>
 
-struct MessageWindow
+enum class MESSAGEBOX_TYPE
 {
-	std::wstring message; 
-	std::wstring name; 
-	uint32_t iconTag;
+	INFO,
+	QUESTION,
+	WARNING,
+	CRITICAL,
 };
 
-class ErrorHandler
+struct MessageLogger final
 {
+	std::string message; 
+	std::string name; 
+	MESSAGEBOX_TYPE type;
+	bool isBlocking;
+};
+
+class ErrorHandler : public QObject
+{
+	Q_OBJECT
 private:
 	std::mutex mutex;
-	std::future<void> task;
-	std::queue<MessageWindow> messageQueue;
+	std::queue<MessageLogger> messageQueue;
+	QMessageBox* activeMessageBox { nullptr };
 
-	void showMessage(const std::wstring& message, const std::wstring& name, const uint32_t& iconTag, bool isBlocking);
-	void shutdownMessages();
+	void createMessageBox(const MessageLogger& message);
 public:
-	ErrorHandler() = default;
+	explicit ErrorHandler(QObject* parent = nullptr) {};
 	~ErrorHandler();
 
-	std::wstring toWString(const std::string& str);
-	void showWarning(const std::wstring& message, bool isBlocking);
-	void showError(const std::wstring& message, bool isBlocking);
+	void showMessage(const std::string& message, const std::string& name, const MESSAGEBOX_TYPE& type, bool isBlocking);
+	void showInfo(const std::string& message, bool isBlocking);
+	void showQuestion(const std::string& message, bool isBlocking);
+	void showWarning(const std::string& message, bool isBlocking);
+	void showError(const std::string& message, bool isBlocking);
+	void update();
 };
 
 #endif
