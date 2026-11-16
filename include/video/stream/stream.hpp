@@ -53,6 +53,7 @@ public:
 	virtual void loadFrame() = 0;
 	virtual void receiveFrame(AVFormatContext*& formatContext) = 0;
 	virtual void saveAsFile() = 0;
+	virtual void closeFile() = 0;
 
 	bool isInvalid() { return invalid; }
 	double getLoadingWeight() { return loadingWeight; }

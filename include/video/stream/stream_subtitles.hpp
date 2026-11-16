@@ -40,7 +40,7 @@ public:
 	void loadFrame() override;
 	void receiveFrame(AVFormatContext*& formatContext) override;
 	void saveAsFile() override;
-	void closeFile();
+	void closeFile() override;
 };
 
 #endif

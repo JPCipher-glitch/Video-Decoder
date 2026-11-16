@@ -33,7 +33,7 @@ LoadingWidget::LoadingWidget(const std::string& videoName, QWidget* parent) : QD
 
             QProgressBar::chunk
             {
-                background-color: #E13C3C;
+                background-color: #E97034;
             }
 
             QPushButton
@@ -50,6 +50,8 @@ LoadingWidget::LoadingWidget(const std::string& videoName, QWidget* parent) : QD
                 background-color: #454545;
             }
         )");
+    // #E13C3C
+    // #E97034
 
     // Deltatime
     elapsedTimer.start();

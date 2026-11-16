@@ -51,6 +51,13 @@ void LoadingHandler::cancelledLoading()
 	cancelled = true;
 	finishedLoading();
 }
+
+void LoadingHandler::cancelLoading()
+{
+	if (!loadingWidget) return;
+	// Cancel the loading and ask to the video to close
+	emit loadingWidget->finishRequested();
+}
 #pragma endregion
 
 #pragma region FINISH LOADING

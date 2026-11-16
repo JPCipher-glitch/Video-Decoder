@@ -255,6 +255,7 @@ void StreamAudio::loadOggSwrContext()
     swr_init(swrContext);
 }
 #pragma endregion
+#pragma endregion
 
 #pragma region LOADING
 void StreamAudio::addProgress(AVFormatContext*& formatContext)
@@ -323,6 +324,8 @@ void StreamAudio::receiveFrame(AVFormatContext*& formatContext)
                 int result = avcodec_receive_frame(decoderContext, frame);
                 if (result == AVERROR(EAGAIN) || result == AVERROR_EOF)
                     break;
+
+                hasEncodedSamples = true;
 
                 // Create the audio file
                 saveAsFile();
@@ -530,14 +533,17 @@ void StreamAudio::saveOggFile()
 }
 void StreamAudio::closeOggFile()
 {
-    // Flush the sampler to get the last samples
-    int64_t delay = swr_get_delay(swrContext, decoderContext->sample_rate);
-    if (delay > 0)
-        saveOggFile();
+    if (hasEncodedSamples)
+    {
+        // Flush the sampler to get the last samples
+        int64_t delay = swr_get_delay(swrContext, decoderContext->sample_rate);
+        if (delay > 0)
+            saveOggFile();
 
-    // Flush encoder
-    avcodec_send_frame(encoderContext, nullptr);
-    writeEncodedPackets();
+        // Flush encoder
+        avcodec_send_frame(encoderContext, nullptr);
+        writeEncodedPackets();
+    }
 
     // Write OGG trailer
     av_write_trailer(formatContext);

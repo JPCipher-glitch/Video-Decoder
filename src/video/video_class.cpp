@@ -27,7 +27,10 @@ void VideoClass::loadAssets()
 		{
 			// Stop the loading if requested
 			if (stopToken.stop_requested())
+			{
+				video.second->closeFile(); // Close the file if it was opened
 				return;
+			}
 
 			video.second->receiveFrame(stuff.formatContext); // Receive all the frames from the video stream
 		}
@@ -173,10 +176,11 @@ VideoClass::VideoClass(const std::string& path, PacketLoad* packet, ErrorHandler
 #pragma region DESTRUCTOR
 VideoClass::~VideoClass()
 {
-	// Remove the cache directory
-	/*fs::path dirPath = std::format("{}/.cache/{}", path, settings.name);
-	if (fs::exists(dirPath) && fs::is_directory(dirPath))
-		fs::remove_all(dirPath);*/
+	// Cancel loading
+	if (loadingHandler)
+		loadingHandler->cancelLoading();
+
+	// Close the video context
 	avformat_close_input(&stuff.formatContext);
 }
 #pragma endregion
@@ -212,6 +216,7 @@ void VideoClass::update()
 		if (loadingHandler->isCancelled())
 		{
 			valid = false;
+			std::cout << std::format("CANCELLED LOADING : {} -> {}{}\n", settings.name, settings.path, settings.videoFormat);
 			requestStop();
 			join();
 			return;

@@ -38,6 +38,7 @@ class StreamAudio : public IVidStream
 {
 private:
 	bool isFileClosed{ false };
+	bool hasEncodedSamples{ false };
 	int outputLayoutIndex{ 0 };
 	
 	std::vector<AVChannelLayout> outputLayoutList{ AV_CHANNEL_LAYOUT_MONO, AV_CHANNEL_LAYOUT_STEREO };
@@ -63,7 +64,6 @@ private:
 	void closeOggFile();
 	void writeEncodedPackets();
 	void encodeCompleteFrames();
-	void closeFile();
 public:
 	StreamAudio(StreamAudioSettings settings, ErrorHandler& errorHandler, VideoLifetime& videoLifetime, LoadingHandler& loadingHandler);
 	~StreamAudio() override;
@@ -79,6 +79,7 @@ public:
 	void loadFormatContext();
 	void receiveFrame(AVFormatContext*& formatContext) override;
 	void saveAsFile() override;
+	void closeFile() override;
 };
 
 #endif

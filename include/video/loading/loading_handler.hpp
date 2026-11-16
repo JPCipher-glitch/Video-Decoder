@@ -34,6 +34,7 @@ public:
 
 	double loadingWeightRatio{ 0.0 };
 	bool isCancelled();
+	void cancelLoading();
 
 	void createLoadingWidget();
 	void addProgress(double progress);

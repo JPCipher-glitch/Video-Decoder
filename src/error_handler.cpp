@@ -115,21 +115,21 @@ void ErrorHandler::update()
 #pragma region PUBLIC MESSAGES
 void ErrorHandler::showInfo(const std::string& message, bool isBlocking)
 {
-    showMessage(message, "VideoDecoder - Info", MESSAGEBOX_TYPE::INFO, isBlocking);
+    showMessage(message, "Video Decoder - Info", MESSAGEBOX_TYPE::INFO, isBlocking);
 }
 
 void ErrorHandler::showQuestion(const std::string& message, bool isBlocking)
 {
-    showMessage(message, "VideoDecoder - Question", MESSAGEBOX_TYPE::QUESTION, isBlocking);
+    showMessage(message, "Video Decoder - Question", MESSAGEBOX_TYPE::QUESTION, isBlocking);
 }
 
 void ErrorHandler::showWarning(const std::string& message, bool isBlocking)
 {
-	showMessage(message, "VideoDecoder - Warning", MESSAGEBOX_TYPE::WARNING, isBlocking);
+	showMessage(message, "Video Decoder - Warning", MESSAGEBOX_TYPE::WARNING, isBlocking);
 }
 
 void ErrorHandler::showError(const std::string& message, bool isBlocking)
 {
-	showMessage(message, "VideoDecoder - Error", MESSAGEBOX_TYPE::CRITICAL, isBlocking);
+	showMessage(message, "Video Decoder - Error", MESSAGEBOX_TYPE::CRITICAL, isBlocking);
 }
 #pragma endregion
