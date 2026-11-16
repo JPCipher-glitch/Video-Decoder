@@ -21,15 +21,18 @@ private:
 	int gotSubtitle = 0;
 	int subsIndex = 0;
 
+	void addProgress(AVFormatContext*& formatContext);
+	void fillRemainingWeight();
 	bool writeFrame(AVFormatContext*& formatContext);
 	void createSubFile();
 	void createSubsCache();
 	std::filesystem::path getFilePath(const std::string& format);
+	std::string getLanguageName();
 	std::string extractAssText(const char* ass);
 	std::string extractText();
 	std::string formatTimestamp(int64_t milliseconds);
 public:
-	StreamSubtitles(StreamSubSettings settings, ErrorHandler& errorHandler, VideoLifetime& videoLifetime);
+	StreamSubtitles(StreamSubSettings settings, ErrorHandler& errorHandler, VideoLifetime& videoLifetime, LoadingHandler& loadingHandler);
 	~StreamSubtitles() override;
 
 	void loadDecoder() override;

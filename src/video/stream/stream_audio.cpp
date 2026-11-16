@@ -6,8 +6,10 @@
 namespace fs = std::filesystem;
 
 #pragma region CONSTRUCTOR
-StreamAudio::StreamAudio(StreamAudioSettings s, ErrorHandler& errorHandler, VideoLifetime& videoLifetime) : settings{ s }, IVidStream{ errorHandler, videoLifetime, s.path, s.stream, s.streamIndex }
+StreamAudio::StreamAudio(StreamAudioSettings s, ErrorHandler& errorHandler, VideoLifetime& videoLifetime, LoadingHandler& loadingHandler) : settings{ s }, IVidStream{ errorHandler, videoLifetime, loadingHandler, s.path, s.stream, s.streamIndex }
 {
+    loadingWeight = 0.4;
+
     createAudioCache();
     loadDecoder();
     loadFrame();
@@ -85,13 +87,19 @@ void StreamAudio::createAudioCache()
 }
 #pragma endregion
 
+#pragma region LANGUAGE
+std::string StreamAudio::getLanguageName()
+{
+    AVDictionaryEntry* language = av_dict_get(stream->metadata, "language", nullptr, 0);
+    return language != nullptr ? language->value : "und";
+}
+#pragma endregion
+
 
 #pragma region FILE PATH
 fs::path StreamAudio::getFilePath(const std::string& format)
 {
-    AVDictionaryEntry* language = av_dict_get(stream->metadata, "language", nullptr, 0);
-	const char* l = language != nullptr ? language->value : "und"; // Use "und" (undefined) if no language is specified
-    fs::path filePath = std::format("{}/audio/audio_{}.{}", path, l, format);
+    fs::path filePath = std::format("{}/audio/audio_{}.{}", path, getLanguageName(), format);
     return filePath;
 }
 #pragma endregion
@@ -248,6 +256,34 @@ void StreamAudio::loadOggSwrContext()
 }
 #pragma endregion
 
+#pragma region LOADING
+void StreamAudio::addProgress(AVFormatContext*& formatContext)
+{
+    int64_t timestamp = frame->best_effort_timestamp;
+    if (formatContext->duration <= 0 || timestamp == AV_NOPTS_VALUE)
+        return;
+
+    double currentTime = static_cast<double>(av_rescale_q(timestamp, stream->time_base, AV_TIME_BASE_Q));
+    double progress = std::clamp(currentTime / static_cast<double>(formatContext->duration), 0.0, 1.0);
+
+    double totalWeight = loadingWeight / loadingHandler.loadingWeightRatio;
+    double weight = (progress - lastProgress) * totalWeight * 100.0;
+
+    if (weight > 0.0)
+    {
+        loadingHandler.addProgress(weight);
+        lastProgress = progress;
+    }
+}
+#pragma endregion
+
+#pragma region REMAINING WEIGHT
+void StreamAudio::fillRemainingWeight()
+{
+    double totalWeight = loadingWeight / loadingHandler.loadingWeightRatio * 100.0;
+    double remainingWeight = totalWeight * (1.0 - lastProgress);
+    loadingHandler.addProgress(remainingWeight);
+}
 #pragma endregion
 
 #pragma region FRAME
@@ -265,6 +301,8 @@ void StreamAudio::loadFrame()
 void StreamAudio::receiveFrame(AVFormatContext*& formatContext)
 {
     if (invalid) return;
+
+    loadingHandler.setStatus(std::format("Loading Audio {}", getLanguageName()));
 
     av_seek_frame(formatContext, -1, 0, AVSEEK_FLAG_BACKWARD); // Reset the reader cursor into the start
     avcodec_flush_buffers(decoderContext); // Wipe the last buffers before reading another sample
@@ -289,13 +327,17 @@ void StreamAudio::receiveFrame(AVFormatContext*& formatContext)
                 // Create the audio file
                 saveAsFile();
 
+                // Add loading progress
+                addProgress(formatContext);
+
                 // Wipe the packet to reusing it
                 av_frame_unref(frame);
             }
         }
         av_packet_unref(sendPacket); // Wipe the packet to reusing it
     }
-
+    // Get the remaining weight that was not added to the widget 
+    fillRemainingWeight();
     // Close the audio file to complete it
     closeFile();
 }

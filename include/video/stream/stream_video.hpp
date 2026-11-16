@@ -26,17 +26,19 @@ class StreamVideo : public IVidStream
 {
 private:
 	uint8_t frameIndex{ 0U };
+	uint8_t preloadingFrameLimit = { 10U };
 	StreamFrameSettings settings;
 	SwsContext* swsContext{ nullptr };
 	AVFrame* exportFrame{ nullptr };
 
+	void addProgress();
 	void createSubFile();
 	void createFramesCache();
 	void createExportFrame();
 	bool writeFrame(AVFormatContext*& formatContext);
 	std::filesystem::path getFilePath(const std::string& format);
 public:
-	StreamVideo(StreamFrameSettings settings, ErrorHandler& errorHandler, VideoLifetime& videoLifetime);
+	StreamVideo(StreamFrameSettings settings, ErrorHandler& errorHandler, VideoLifetime& videoLifetime, LoadingHandler& loadingHandler);
 	~StreamVideo() override;
 
 	void loadDecoder() override;

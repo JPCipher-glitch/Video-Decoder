@@ -8,8 +8,10 @@ namespace fs = std::filesystem;
 void StreamSubtitles::loadEncoder() {}
 
 #pragma region CONSTRUCTOR
-StreamSubtitles::StreamSubtitles(StreamSubSettings s, ErrorHandler& errorHandler, VideoLifetime& videoLifetime) : settings{ s }, IVidStream{ errorHandler, videoLifetime, s.path, s.stream, s.streamIndex }
+StreamSubtitles::StreamSubtitles(StreamSubSettings s, ErrorHandler& errorHandler, VideoLifetime& videoLifetime, LoadingHandler& loadingHandler) : settings{ s }, IVidStream{ errorHandler, videoLifetime, loadingHandler, s.path, s.stream, s.streamIndex }
 {
+    loadingWeight = 0.3;
+
     createSubsCache();
     loadDecoder();
     loadFrame();
@@ -23,20 +25,7 @@ StreamSubtitles::~StreamSubtitles()
     // Close file
     closeFile();
 
-    //try
-    //{
-    //    // Remove the cache directory
-    //    fs::path dirPath = std::format("{}/subtitles", path);
-    //    if (fs::exists(dirPath) && fs::is_directory(dirPath))
-    //        fs::remove_all(dirPath);
-    //}
-    //catch (const std::filesystem::filesystem_error& e)
-    //{
-    //    std::cerr << "ERROR: " << e.what() << std::endl;
-    //}
-
     // Cleanup
-    av_frame_free(&frame);
     av_packet_free(&sendPacket);
     avcodec_free_context(&decoderContext);
     avsubtitle_free(&subtitle);
@@ -73,12 +62,18 @@ void StreamSubtitles::createSubsCache()
 }
 #pragma endregion
 
+#pragma region LANGUAGE
+std::string StreamSubtitles::getLanguageName()
+{
+    AVDictionaryEntry* language = av_dict_get(stream->metadata, "language", nullptr, 0);
+    return language != nullptr ? language->value : "und";
+}
+#pragma endregion
 
 #pragma region FILE PATH
 fs::path StreamSubtitles::getFilePath(const std::string& format)
 {
-    AVDictionaryEntry* language = av_dict_get(stream->metadata, "language", nullptr, 0);
-    fs::path filePath = std::format("{}/subtitles/subtitle_{}.{}", path, language->value, format);
+    fs::path filePath = std::format("{}/subtitles/subtitle_{}.{}", path, getLanguageName(), format);
     return filePath;
 }
 #pragma endregion
@@ -100,6 +95,35 @@ std::string StreamSubtitles::formatTimestamp(int64_t milliseconds)
 }
 #pragma endregion
 
+#pragma region LOADING
+void StreamSubtitles::addProgress(AVFormatContext*& formatContext)
+{
+    int64_t timestamp = sendPacket->pts;
+    if (stream->duration <= 0 || timestamp == AV_NOPTS_VALUE)
+        return;
+
+    double currentTime = static_cast<double>(av_rescale_q(timestamp, stream->time_base, AV_TIME_BASE_Q));
+    double progress = std::clamp(currentTime / static_cast<double>(stream->duration), 0.0, 1.0);
+
+    double totalWeight = static_cast<double>(loadingWeight) / loadingHandler.loadingWeightRatio;
+    double weight = (progress - lastProgress) * totalWeight * 100.0;
+
+    if (weight > 0.0)
+    {
+        loadingHandler.addProgress(weight);
+        lastProgress = progress;
+    }
+}
+#pragma endregion
+
+#pragma region REMAINING WEIGHT
+void StreamSubtitles::fillRemainingWeight()
+{
+    double totalWeight = static_cast<double>(loadingWeight) / loadingHandler.loadingWeightRatio * 100.0;
+    double remainingWeight = totalWeight * (1.0 - lastProgress);
+    loadingHandler.addProgress(remainingWeight);
+}
+#pragma endregion
 
 #pragma region FRAME
 void StreamSubtitles::loadFrame()
@@ -107,7 +131,6 @@ void StreamSubtitles::loadFrame()
     if (invalid) return;
     // Allocate the AVPacket & AVFrame
     sendPacket = av_packet_alloc();
-    frame = av_frame_alloc();
 }
 
 bool StreamSubtitles::writeFrame(AVFormatContext*& formatContext)
@@ -123,6 +146,9 @@ bool StreamSubtitles::writeFrame(AVFormatContext*& formatContext)
         // Save the subtitle to file if it was successfully decoded
         if (gotSubtitle)
             saveAsFile();
+
+        // Add loading progress
+        addProgress(formatContext);
     }
     av_packet_unref(sendPacket); // Wipe the packet to reusing it
     return true;
@@ -131,6 +157,8 @@ bool StreamSubtitles::writeFrame(AVFormatContext*& formatContext)
 void StreamSubtitles::receiveFrame(AVFormatContext*& formatContext)
 {
     if (invalid) return;
+
+    loadingHandler.setStatus(std::format("Loading Subtitles {}", getLanguageName()));
 
     av_seek_frame(formatContext, -1, 0, AVSEEK_FLAG_BACKWARD); // Reset the reader cursor into the start
     avcodec_flush_buffers(decoderContext); // Wipe the last buffers before reading another sample
@@ -141,7 +169,8 @@ void StreamSubtitles::receiveFrame(AVFormatContext*& formatContext)
         if (!writeFrame(formatContext))
             break;
     }
-
+    // Get the remaining weight that was not added to the widget 
+    fillRemainingWeight();
     // Close the subs file to complete it
     closeFile();
 }

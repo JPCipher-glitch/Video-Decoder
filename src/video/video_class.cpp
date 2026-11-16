@@ -18,9 +18,6 @@ void VideoClass::loadAssets()
 	if (isLoading.exchange(true))
 		return;
 
-	// Create the loading widget
-	//loadingWidget = std::make_unique<LoadingWidget>();
-
 	isLoading = true; // Set the loading state to true
 	streamTimeStart = std::chrono::duration<float>(std::chrono::steady_clock::now().time_since_epoch()).count();
 
@@ -67,9 +64,16 @@ void VideoClass::loadStreams()
 	{
 		AVMediaType type = stuff.formatContext->streams[i]->codecpar->codec_type;
 		if (stuff.availableStreamType.contains(type) && loadStreamMap.contains(type)) // Add each available stream necessary to extract data into the video file
-		{	
-			AVStream* stream = stuff.formatContext->streams[i];
-			stuff.videoStreamMap.insert(std::make_pair(type, loadStreamMap[type](stream, i)));
+		{
+			// Create the stream
+			AVStream* s = stuff.formatContext->streams[i];
+			std::unique_ptr<IVidStream> stream = loadStreamMap[type](s, i);
+
+			// Add the stream weight into the global ratio
+			loadingHandler->loadingWeightRatio += stream->getLoadingWeight();
+
+			// Insert the stream in the map
+			stuff.videoStreamMap.insert(std::make_pair(type, std::move(stream)));
 		}
 	}
 }
@@ -133,26 +137,30 @@ void VideoClass::join()
 #pragma region CONSTRUCTOR
 VideoClass::VideoClass(const std::string& path, PacketLoad* packet, ErrorHandler& handler) : path{ path }, settings{ *packet }, errorHandler{ handler }
 {
+	// Create the loading handler
+	loadingHandler = new LoadingHandler(packet->name);
+
 	// Fill the load map
 	loadStreamMap.emplace(AVMediaType::AVMEDIA_TYPE_VIDEO, [this](AVStream* stream, int streamIndex)
 	{
 		StreamFrameSettings frameSettings{ std::format("{}/.cache/{}", this->path, settings.name), settings.frameFormat, stream, streamIndex, settings.width, settings.height, settings.fps };
-		auto s = std::make_unique<StreamVideo>(frameSettings, errorHandler, videoLifetime);
+		auto s = std::make_unique<StreamVideo>(frameSettings, errorHandler, videoLifetime, *loadingHandler);
 		return std::move(s);
 	});
 	loadStreamMap.emplace(AVMediaType::AVMEDIA_TYPE_AUDIO, [this](AVStream* stream, int streamIndex) 
 	{
 		StreamAudioSettings audioSettings{ std::format("{}/.cache/{}", this->path, settings.name), settings.audioFormat, stream, streamIndex, settings.audioSampleRate, settings.audioChannels, settings.audioQuality };
-		auto s = std::make_unique<StreamAudio>(audioSettings, errorHandler, videoLifetime);
+		auto s = std::make_unique<StreamAudio>(audioSettings, errorHandler, videoLifetime, *loadingHandler);
 		return std::move(s);
 	});
 	loadStreamMap.emplace(AVMediaType::AVMEDIA_TYPE_SUBTITLE, [this](AVStream* stream, int streamIndex)
 	{
 		StreamSubSettings subSettings{ std::format("{}/.cache/{}", this->path, settings.name), stream, streamIndex };
-		auto s = std::make_unique<StreamSubtitles>(subSettings, errorHandler, videoLifetime);
+		auto s = std::make_unique<StreamSubtitles>(subSettings, errorHandler, videoLifetime, *loadingHandler);
 		return std::move(s);
 	});
 
+	// Display the time to receive the packet
 	if (valid)
 	{
 		double now = std::chrono::duration<float>(std::chrono::steady_clock::now().time_since_epoch()).count();
@@ -190,12 +198,29 @@ void VideoClass::load()
 #pragma region UPDATE
 void VideoClass::update()
 {
+	// Initialize the streams
 	if (!initialized)
 		load();
 
 	initialized = true;
 
-	if (!isLoaded) return;
+	// Update the loading handler
+	if (loadingHandler)
+	{
+		loadingHandler->update();
+		// Close the video cache if the loading was cancelled
+		if (loadingHandler->isCancelled())
+		{
+			valid = false;
+			requestStop();
+			join();
+			return;
+		}
+	}
+
+	if (!isLoaded) return; // Don't execute the rest of the class programm while it is not yet loaded
+
+	loadingHandler->addProgress(1.0); // Complete the loading progress when the loading is finished (It generally stop nearly 99%)
 
 	// LOG
 	if (!islog)

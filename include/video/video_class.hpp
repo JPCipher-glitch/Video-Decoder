@@ -4,7 +4,7 @@
 #include "video/video_stuff.hpp"
 #include "video/video_packets.hpp"
 #include "video/video_lifetime.hpp"
-#include "video/loading/loading_widget.hpp"
+#include "video/loading/loading_handler.hpp"
 #include "error_handler.hpp"
 
 #include <atomic>
@@ -31,7 +31,7 @@ private:
 	VideoLifetime videoLifetime;
 	ErrorHandler& errorHandler;
 	
-	std::unique_ptr<LoadingWidget> loadingWidget;
+	LoadingHandler* loadingHandler{ nullptr };
 
 	double streamTimeStart = 0.0;
 

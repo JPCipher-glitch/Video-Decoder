@@ -3,6 +3,7 @@
 
 #include "error_handler.hpp"
 #include "video/video_lifetime.hpp"
+#include "video/loading/loading_handler.hpp"
 #include <string>
 extern "C"
 {
@@ -27,6 +28,11 @@ protected:
 	// Video Lifetime
 	VideoLifetime& videoLifetime;
 
+	// Loading Handler
+	LoadingHandler& loadingHandler;
+	double loadingWeight{ 0.0 };
+	double lastProgress{ 0.0 };
+
 	// Decoder
 	const AVCodec* decoder = nullptr;
 	AVCodecContext* decoderContext = nullptr; // Context
@@ -40,7 +46,7 @@ protected:
 	AVPacket* receivePacket = nullptr;
 	AVFrame* frame = nullptr;
 public:
-	IVidStream(ErrorHandler& errorHandler, VideoLifetime& videoLifetime, std::string path, AVStream* stream, int streamIndex) : errorHandler{ errorHandler }, videoLifetime{ videoLifetime }, path{path}, stream{stream}, streamIndex{streamIndex} {};
+	IVidStream(ErrorHandler& errorHandler, VideoLifetime& videoLifetime, LoadingHandler& loadingHandler, std::string path, AVStream* stream, int streamIndex) : errorHandler{ errorHandler }, videoLifetime{ videoLifetime }, loadingHandler{ loadingHandler }, path{path}, stream{stream}, streamIndex{streamIndex} {};
 	virtual ~IVidStream() {};
 	virtual void loadDecoder() = 0;
 	virtual void loadEncoder() = 0;
@@ -49,6 +55,7 @@ public:
 	virtual void saveAsFile() = 0;
 
 	bool isInvalid() { return invalid; }
+	double getLoadingWeight() { return loadingWeight; }
 };
 
 #endif

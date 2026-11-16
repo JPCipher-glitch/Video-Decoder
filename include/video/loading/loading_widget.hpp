@@ -1,30 +1,43 @@
 #ifndef LOADING_WIDGET_HPP
 #define LOADING_WIDGET_HPP
 
-#define WIN32_LEAN_AND_MEAN // Exclude rarely-used stuff from Windows headers
-#include <Windows.h>
-#include <stdint.h>
+#include <QDialog>
+#include <QLabel>
+#include <QProgressBar>
+#include <QPushButton>
+#include <QElapsedTimer>
+#include <QTimer>
 
-class LoadingWidget final
+class LoadingWidget : public QDialog
 {
+    Q_OBJECT
 private:
-    HWND widget{ 0 };
-	HWND progressBar{ 0 };
+    bool finished{ false };
 
-	COLORREF captionColor;
-	COLORREF textColor;
+    float speed{ 200.f };
+    float shutdownDelay{ 1.f };
+    double progress{ 0.0 };
+    double gainProgress{ 0.0 };
 
-	uint8_t progress{ 0 };
-	uint8_t progressGain{ 0 };
+    QLabel* videoLabel{ nullptr };
+    QLabel* statusLabel{ nullptr };
 
-	bool inDarkMode{ false };
+    QTimer* timer{ nullptr };
+    QElapsedTimer elapsedTimer;
 
-	void createWidget();
-	void createProgressBar();
-	void update();
+    QProgressBar* progressBar{ nullptr };
+    QPushButton* cancelButton{ nullptr };
+
+    void cancelLoading();
+    void finishLoading();
+    void updateProgress();
+signals:
+    void cancelRequested();
+    void finishRequested();
 public:
-	LoadingWidget();
-	~LoadingWidget();
-};
+    explicit LoadingWidget(const std::string& videoName, QWidget* parent = nullptr);
 
+    void addProgress(double progress);
+    void setStatus(const QString& status);
+};
 #endif

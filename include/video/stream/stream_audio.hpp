@@ -52,7 +52,10 @@ private:
 
 	StreamAudioSettings settings;
 
+	std::string getLanguageName();
 	std::filesystem::path getFilePath(const std::string& format);
+	void addProgress(AVFormatContext*& formatContext);
+	void fillRemainingWeight();
 	void createAudioCache();
 	void saveWavFile();
 	void saveOggFile();
@@ -62,7 +65,7 @@ private:
 	void encodeCompleteFrames();
 	void closeFile();
 public:
-	StreamAudio(StreamAudioSettings settings, ErrorHandler& errorHandler, VideoLifetime& videoLifetime);
+	StreamAudio(StreamAudioSettings settings, ErrorHandler& errorHandler, VideoLifetime& videoLifetime, LoadingHandler& loadingHandler);
 	~StreamAudio() override;
 
 	void createWavAudioWriter();

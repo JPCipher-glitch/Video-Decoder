@@ -6,8 +6,10 @@
 namespace fs = std::filesystem;
 
 #pragma region CONSTRUCTOR
-StreamVideo::StreamVideo(StreamFrameSettings s, ErrorHandler& errorHandler, VideoLifetime& videoLifetime) : settings{ s }, IVidStream{ errorHandler, videoLifetime, s.path, s.stream, s.streamIndex }
+StreamVideo::StreamVideo(StreamFrameSettings s, ErrorHandler& errorHandler, VideoLifetime& videoLifetime, LoadingHandler& loadingHandler) : settings{ s }, IVidStream{ errorHandler, videoLifetime, loadingHandler, s.path, s.stream, s.streamIndex }
 {
+    loadingWeight = 0.3;
+
     createFramesCache();
     loadDecoder();
     loadEncoder();
@@ -129,6 +131,15 @@ fs::path StreamVideo::getFilePath(const std::string& format)
 }
 #pragma endregion
 
+#pragma region LOADING
+void StreamVideo::addProgress()
+{
+    // Calculate the progress wait
+    double totalWeight = loadingWeight / loadingHandler.loadingWeightRatio * 100.0;
+    double weight = totalWeight / static_cast<double>(preloadingFrameLimit);
+    loadingHandler.addProgress(weight);
+}
+#pragma endregion
 
 #pragma region FRAME
 void StreamVideo::loadFrame()
@@ -158,7 +169,8 @@ bool StreamVideo::writeFrame(AVFormatContext*& formatContext)
 
             // Create the audio file
             saveAsFile();
-
+            // Add loading progress
+            addProgress();
             // Wipe the packet to reusing it
             av_frame_unref(frame);
         }
@@ -170,6 +182,8 @@ bool StreamVideo::writeFrame(AVFormatContext*& formatContext)
 void StreamVideo::receiveFrame(AVFormatContext*& formatContext)
 {
     if (invalid) return;
+
+    loadingHandler.setStatus("Loading Frames");
 
     av_seek_frame(formatContext, streamIndex, 0, AVSEEK_FLAG_BACKWARD); // Reset the reader cursor into the start
     avcodec_flush_buffers(decoderContext); // Wipe the last buffers before reading another sample

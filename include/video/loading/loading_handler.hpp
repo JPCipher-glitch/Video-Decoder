@@ -1,28 +1,44 @@
 #ifndef LOADING_HANDLER_HPP
 #define LOADING_HANDLER_HPP
 
-#define WIN32_LEAN_AND_MEAN // Exclude rarely-used stuff from Windows headers
-#include <Windows.h>
-#include <CommCtrl.h>
-#include <thread>
+#include "video/loading/loading_widget.hpp"
 
-#pragma comment(lib, "Comctl32.lib")
+#include <QObject>
+#include <mutex>
+#include <queue>
 
-class LoadingHandler final
+struct ProgressStuff
 {
+	double progress{ 0.0 };
+};
+
+class LoadingHandler : public QObject
+{
+	Q_OBJECT
 private:
-	INITCOMMONCONTROLSEX initCommonControls;
-	WNDCLASSEXW widgetClass{};
-	MSG messageHandler{};
+	bool cancelled{ false };
 
-	std::jthread task;
-	DWORD threadId {0};
+	std::string name;
+	std::string status = "Initializing...";
 
-	void handlerTask(std::stop_token stopToken);
-	LRESULT CALLBACK loadingEvents(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
+	std::mutex mutex;
+	std::queue<ProgressStuff> progressQueue;
+
+	LoadingWidget* loadingWidget{ nullptr };
+
+	void cancelledLoading();
+	void finishedLoading();
 public:
-	LoadingHandler();
+	LoadingHandler(const std::string& name);
 	~LoadingHandler();
+
+	double loadingWeightRatio{ 0.0 };
+	bool isCancelled();
+
+	void createLoadingWidget();
+	void addProgress(double progress);
+	void setStatus(const std::string& status);
+	void update();
 };
 
 #endif

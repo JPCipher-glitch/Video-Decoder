@@ -1,90 +1,174 @@
 #include "video/loading/loading_widget.hpp"
-#include <dwmapi.h>
-#pragma comment(lib, "Dwmapi.lib")
+#include <QVBoxLayout>
+#include <QHBoxLayout>
 
 #pragma region CONSTRUCTOR
-LoadingWidget::LoadingWidget()
+LoadingWidget::LoadingWidget(const std::string& videoName, QWidget* parent) : QDialog(parent)
 {
-	createWidget();
-	createProgressBar();
-    update();
-}
-#pragma endregion
+    // Main Settings
+    setWindowTitle("Video Decoder - Loading");
+    setFixedSize(350, 120);
+    setStyleSheet(
+        R"(
+            QDialog
+            {
+                background-color: #202020;
+                color: #FFFFFF;
+            }
 
-#pragma region DESTRUCTOR
-LoadingWidget::~LoadingWidget()
-{
-    // Destroy the widget
-    if (widget)
-        DestroyWindow(widget);
-}
-#pragma endregion
+            QLabel
+            {
+                color: #DDDDDD;
+                font-size: 12px;
+            }
 
-#pragma region WIDGET
-void LoadingWidget::createWidget()
-{
-    // Create the widget 
-    widget = CreateWindowExW
-    (
-        WS_EX_DLGMODALFRAME,
-        L"VideoDecoderLoadingWindow",
-        L"Video Decoder - Loading",
-        WS_CAPTION | WS_SYSMENU,
-        CW_USEDEFAULT,
-        CW_USEDEFAULT,
-        400,
-        150,
-        nullptr,
-        nullptr,
-        GetModuleHandleW(nullptr),
-        nullptr
-    );
-	// Set the dark colors if enabled
-    if (inDarkMode)
-    {
-        // Colors
-        captionColor = RGB(30, 30, 30);
-        textColor = RGB(255, 255, 255);
+            QProgressBar
+            {
+                border: 1px solid #404040;
+                background-color: #151515;
+                text-align: center;
+                color: white;
+                height: 12px;
+            }
 
-		// Set the colors
-        DwmSetWindowAttribute(widget, DWMWA_CAPTION_COLOR, &captionColor, sizeof(captionColor)); // Title bar background
-        DwmSetWindowAttribute(widget, DWMWA_TEXT_COLOR, &textColor, sizeof(textColor)); // Title bar text
-    }
-}
+            QProgressBar::chunk
+            {
+                background-color: #E13C3C;
+            }
 
-void LoadingWidget::update()
-{
-    // Show & Update the widget
-    ShowWindow(widget, SW_SHOW);
-    UpdateWindow(widget);
-}
-#pragma endregion
+            QPushButton
+            {
+                background-color: #353535;
+                color: white;
+                border: 1px solid #505050;
+                border-radius: 4px;
+                padding: 5px 15px;
+            }
 
-#pragma region PROGRESS BAR
-void LoadingWidget::createProgressBar()
-{
+            QPushButton:hover
+            {
+                background-color: #454545;
+            }
+        )");
+
+    // Deltatime
+    elapsedTimer.start();
+
+    // Timer
+    timer = new QTimer(this);
+    connect(timer, &QTimer::timeout, this, &LoadingWidget::updateProgress);
+    timer->start(16);
+
+    // Initialize the text labels
+    videoLabel = new QLabel(QString("<p align='center'>Loading \"%1\" cache</p>").arg(videoName), this);
+    statusLabel = new QLabel("<p align='center'>Initializing...</p>", this);
+    statusLabel->setStyleSheet(
+        R"(
+            QLabel
+            {
+                color: #FFEB96;
+                font-size: 12px;
+            }
+        )");
+
     // Create the progress bar
-    progressBar = CreateWindowExW
-    (
-        0,
-        PROGRESS_CLASSW,
-        nullptr,
-        WS_CHILD | WS_VISIBLE | PBS_SMOOTH,
-        20, 50,
-        340, 20,
-        widget,
-        reinterpret_cast<HMENU>(100),
-        GetModuleHandleW(nullptr),
-        nullptr
-    );
-    // Set the dark colors if enabled
-    if (inDarkMode)
+    progressBar = new QProgressBar(this);
+    progressBar->setRange(0, 100);
+    progressBar->setValue(0);
+
+    // Cancel Button
+    cancelButton = new QPushButton("Cancel", this);
+    cancelButton->setFixedSize(QSize(96, 22));
+    connect(cancelButton, &QPushButton::clicked, this, &LoadingWidget::cancelRequested);
+
+    // Button layout
+    QHBoxLayout* buttonLayout = new QHBoxLayout();
+    buttonLayout->addWidget(cancelButton);
+
+    // Main Layout
+    QVBoxLayout* mainLayout = new QVBoxLayout(this);
+    mainLayout->addWidget(videoLabel);
+    mainLayout->addWidget(statusLabel);
+    mainLayout->addWidget(progressBar);
+    mainLayout->addLayout(buttonLayout);
+
+    // Cancel Signal
+    connect(this, &LoadingWidget::cancelRequested, this, &LoadingWidget::cancelLoading);
+    // Finish Signal
+    connect(this, &LoadingWidget::finishRequested, this, &LoadingWidget::finishLoading);
+}
+#pragma endregion
+
+#pragma region CANCEL
+void LoadingWidget::cancelLoading()
+{
+    if (finished) return;
+
+    finished = true;
+    cancelButton->setEnabled(false);
+    timer->stop();
+
+    statusLabel->setText("<p align='center'>Cancelling...</p>");
+
+    QTimer::singleShot(shutdownDelay * 1000, this, &QObject::deleteLater);
+    emit cancelRequested();
+}
+#pragma endregion
+
+#pragma region FINISH
+void LoadingWidget::finishLoading()
+{
+    if (finished) return;
+
+    finished = true;
+    cancelButton->setEnabled(false);
+    timer->stop();
+
+    statusLabel->setText("<p align='center'>Finished...</p>");
+
+    QTimer::singleShot(shutdownDelay * 1000, this, &QObject::deleteLater);
+    emit finishRequested();
+}
+#pragma endregion
+
+#pragma region STATUS
+void LoadingWidget::setStatus(const QString& status)
+{
+    if (progress >= 100) return;
+
+    statusLabel->setText(QString("<p align='center'>%1</p>").arg(status));
+}
+#pragma endregion
+
+#pragma region PROGRESS
+void LoadingWidget::addProgress(double p)
+{
+    if (progress >= 100) return;
+
+    gainProgress += p;
+}
+
+void LoadingWidget::updateProgress()
+{
+    // Calculate the delta time
+    float dt = elapsedTimer.restart() / 1000.f;
+    double progressDelta = static_cast<double>(dt) * 50.0;
+
+    // Add step by step the progress into the widget
+    if (gainProgress > 0.f)
     {
-        // SET THE PROGRESS BAR INTO THE WIDGET
-        SendMessageW(progressBar, PBM_SETRANGE32, 0, 100);
-        SendMessageW(progressBar, PBM_SETPOS, 0, 0);
-        SendMessageW(progressBar, PBM_SETBARCOLOR, 0, RGB(255, 60, 60));
-        SendMessageW(progressBar, PBM_SETBKCOLOR, 0, RGB(40, 40, 40));
+        double step = std::min(gainProgress, progressDelta); // Prevent of using the actual deltatime when the gain progress is smaller
+
+        gainProgress -= step;
+        progress += step;
     }
+
+    // Set the new value to the widget
+    progress = std::min(progress, 100.0);
+    progressBar->setValue(static_cast<int>(progress));
+
+    // Finish the loading when the progress reach 100%
+    if (progress >= 100 && !finished)
+        finishRequested();
 }
 #pragma endregion
