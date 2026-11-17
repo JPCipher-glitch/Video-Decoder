@@ -8,7 +8,18 @@
 extern "C"
 {
 	#include <libswscale/swscale.h>
+	#include <libavfilter/avfilter.h>
+	#include <libavfilter/buffersrc.h>
+	#include <libavfilter/buffersink.h>
+	#include <libavutil/opt.h>
 }
+
+struct FilterData
+{
+	AVFilterGraph* filterGraph{ nullptr };
+	AVFilterContext* bufferSrcContext{ nullptr };
+	AVFilterContext* bufferSinkContext{ nullptr };
+};
 
 struct StreamFrameSettings
 {
@@ -19,7 +30,7 @@ struct StreamFrameSettings
 
 	uint16_t width;
 	uint16_t height;
-	float fps;
+	uint8_t fps;
 };
 
 class StreamVideo : public IVidStream
@@ -31,10 +42,15 @@ private:
 	SwsContext* swsContext{ nullptr };
 	AVFrame* exportFrame{ nullptr };
 
+	AVFrame* filteredFrame{ nullptr };
+
+	FilterData filterData;
+
 	void addProgress();
 	void createSubFile();
 	void createFramesCache();
 	void createExportFrame();
+	bool loadFilter();
 	bool writeFrame(AVFormatContext*& formatContext);
 	std::filesystem::path getFilePath(const std::string& format);
 public:

@@ -125,7 +125,7 @@ std::unique_ptr<IPacket> Command::loadVideo(Serializer& s)
     // Read the numerical data
     p->width = s.read<uint16_t>();
     p->height = s.read<uint16_t>();
-    p->fps = s.read<float>();
+    p->fps = s.read<uint8_t>();
 
     // Read the audio data
     p->audioSampleRate = s.read<uint32_t>();

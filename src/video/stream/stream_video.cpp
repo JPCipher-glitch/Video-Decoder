@@ -1,4 +1,5 @@
 #include "video/stream/stream_video.hpp"
+
 #include <iostream>
 #include <iomanip>
 #include <sstream>
@@ -14,6 +15,7 @@ StreamVideo::StreamVideo(StreamFrameSettings s, ErrorHandler& errorHandler, Vide
     loadDecoder();
     loadEncoder();
     loadFrame();
+    loadFilter();
     loadSwsContext();
     createExportFrame();
 }
@@ -24,10 +26,15 @@ StreamVideo::~StreamVideo()
 {
     // Cleanup
     av_frame_free(&frame);
+    av_frame_free(&filteredFrame);
     av_packet_free(&sendPacket);
     av_packet_free(&receivePacket);
     avcodec_free_context(&decoderContext);
     avcodec_free_context(&encoderContext);
+	// Filter cleanup
+    avfilter_graph_free(&filterData.filterGraph);
+    filterData.bufferSrcContext = nullptr;
+    filterData.bufferSinkContext = nullptr;
 }
 #pragma endregion
 
@@ -60,16 +67,53 @@ void StreamVideo::loadEncoder()
     // Create the PNG encoder
     encoderContext = avcodec_alloc_context3(encoder);
 
+    // Calculate the FPS
+    double fps = av_q2d(stream->avg_frame_rate);
+	uint8_t roundedFps = static_cast<uint8_t>(std::round(fps));
+	uint8_t finalFps = std::min(roundedFps, settings.fps); // Use the minimum between the rounded FPS and the user-defined FPS
+
     // Get the settings
     encoderContext->width = settings.width;
     encoderContext->height = settings.height;
     encoderContext->pix_fmt = AV_PIX_FMT_RGB24;
-    encoderContext->time_base = { 1, 25 };
+    encoderContext->time_base = { 1, finalFps };
 
     // Open encoder
     avcodec_open2(encoderContext, encoder, nullptr);
 }
 #pragma endregion
+
+#pragma region FILTER
+bool StreamVideo::loadFilter()
+{
+    const AVFilter* bufferSrc = avfilter_get_by_name("buffer");
+    const AVFilter* bufferSink = avfilter_get_by_name("buffersink");
+
+    filterData.filterGraph = avfilter_graph_alloc();
+    if (filterData.filterGraph == nullptr)
+        return false;
+
+    const AVRational timeBase = stream->time_base;
+    const AVRational sampleAspectRatio = decoderContext->sample_aspect_ratio;
+
+    char args[512];
+    snprintf(args, sizeof(args), "video_size=%dx%d:pix_fmt=%d:time_base=%d/%d:pixel_aspect=%d/%d", decoderContext->width, decoderContext->height, decoderContext->pix_fmt, timeBase.num, timeBase.den, sampleAspectRatio.num, sampleAspectRatio.den);
+
+    avfilter_graph_create_filter(&filterData.bufferSrcContext, bufferSrc, "in", args, nullptr, filterData.filterGraph);
+    avfilter_graph_create_filter(&filterData.bufferSinkContext, bufferSink, "out", nullptr, nullptr, filterData.filterGraph);
+
+    AVFilterContext* fpsFilter = nullptr;
+    avfilter_graph_create_filter(&fpsFilter, avfilter_get_by_name("fps"), "fps", "fps=60", nullptr, filterData.filterGraph);
+
+    avfilter_link(filterData.bufferSrcContext, 0, fpsFilter, 0);
+    avfilter_link(fpsFilter, 0, filterData.bufferSinkContext, 0);
+
+    avfilter_graph_config(filterData.filterGraph, nullptr);
+
+    return true;
+}
+#pragma endregion
+
 
 #pragma region SWS CONTEXT
 void StreamVideo::loadSwsContext()
@@ -149,6 +193,7 @@ void StreamVideo::loadFrame()
     sendPacket = av_packet_alloc();
     frame = av_frame_alloc();
     receivePacket = av_packet_alloc();
+    filteredFrame = av_frame_alloc();
 }
 
 bool StreamVideo::writeFrame(AVFormatContext*& formatContext)
@@ -167,10 +212,22 @@ bool StreamVideo::writeFrame(AVFormatContext*& formatContext)
             if (result == AVERROR(EAGAIN) || result == AVERROR_EOF)
                 return true;
 
-            // Create the audio file
-            saveAsFile();
-            // Add loading progress
-            addProgress();
+			// Send the frame to the filter graph
+            result = av_buffersrc_add_frame_flags(filterData.bufferSrcContext, frame, AV_BUFFERSRC_FLAG_KEEP_REF);
+            if (result == AVERROR(EAGAIN) || result == AVERROR_EOF)
+                return true;
+
+            while (av_buffersink_get_frame(filterData.bufferSinkContext, filteredFrame) >= 0)
+            {
+                // Create the audio file
+                saveAsFile();
+                // Add loading progress
+                addProgress();
+
+                // Wipe the packet to reusing it
+                av_frame_unref(filteredFrame);
+            }
+
             // Wipe the packet to reusing it
             av_frame_unref(frame);
         }
@@ -194,22 +251,39 @@ void StreamVideo::receiveFrame(AVFormatContext*& formatContext)
         if (!writeFrame(formatContext) || frameIndex >= 10)
             break;
     }
+
+	// Flush the decoder
+    avcodec_send_packet(decoderContext, nullptr);
+	// Flush the filter decoder
+    av_buffersrc_add_frame_flags(filterData.bufferSrcContext, nullptr, 0);
+
+	// Get the lost frames from the filter graph
+    while (av_buffersink_get_frame(filterData.bufferSinkContext, filteredFrame) >= 0)
+    {
+        // Create the audio file
+        saveAsFile();
+        // Add loading progress
+        addProgress();
+
+        // Wipe the packet to reusing it
+        av_frame_unref(filteredFrame);
+    }
 }
 #pragma endregion
 
 #pragma region FILE
 void StreamVideo::saveAsFile()
 {
-    // Rescale the export frame with the sws ctx
+    // Rescale the export filteredFrame with the sws ctx
     sws_scale
     (
         swsContext,
 
-        frame->data,
-        frame->linesize,
+        filteredFrame->data,
+        filteredFrame->linesize,
 
         0,
-        frame->height,
+        filteredFrame->height,
 
         exportFrame->data,
         exportFrame->linesize

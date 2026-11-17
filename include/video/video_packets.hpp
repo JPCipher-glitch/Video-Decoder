@@ -22,14 +22,14 @@ struct PacketLoad : public IPacket
 	std::string videoFormat = ".mp4";
 
 	// Video settings
-	uint16_t width = 1920u;
-	uint16_t height = 1080u;
-	float fps = 60.f;
+	uint16_t width = 1920U;
+	uint16_t height = 1080U;
+	uint8_t fps = 5U;
 
 	// Audio settings
-	uint32_t audioSampleRate = 44100u;
-	uint16_t audioChannels = 2u;
-	int8_t audioQuality = 6u; // Apply only for .ogg audio
+	uint32_t audioSampleRate = 44100U;
+	uint16_t audioChannels = 2U;
+	int8_t audioQuality = 6U; // Apply only for .ogg audio
 
 	~PacketLoad() override {};
 };

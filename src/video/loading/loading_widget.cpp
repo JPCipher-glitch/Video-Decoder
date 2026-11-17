@@ -52,6 +52,7 @@ LoadingWidget::LoadingWidget(const std::string& videoName, QWidget* parent) : QD
         )");
     // #E13C3C
     // #E97034
+    // #3985DC
 
     // Deltatime
     elapsedTimer.start();
