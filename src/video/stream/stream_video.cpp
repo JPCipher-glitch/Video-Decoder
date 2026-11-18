@@ -32,27 +32,49 @@ StreamVideo::~StreamVideo()
     avcodec_free_context(&decoderContext);
     avcodec_free_context(&encoderContext);
 	// Filter cleanup
-    avfilter_graph_free(&filterData.filterGraph);
-    filterData.bufferSrcContext = nullptr;
-    filterData.bufferSinkContext = nullptr;
+    if (filterData.filterGraph != nullptr)
+    {
+        avfilter_graph_free(&filterData.filterGraph);
+        filterData.bufferSrcContext = nullptr;
+        filterData.bufferSinkContext = nullptr;
+    }
 }
 #pragma endregion
 
 #pragma region DECODER
 void StreamVideo::loadDecoder()
 {
+    if (invalid) return;
+
     // Find a registered decoder
-    decoder = avcodec_find_decoder_by_name("libdav1d");
+    if (stream->codecpar->codec_id == AV_CODEC_ID_AV1)
+        decoder = avcodec_find_decoder_by_name("av1");
+    else
+        decoder = avcodec_find_decoder(stream->codecpar->codec_id);
+
+    void* opaque = nullptr;
+
+    while ((decoder = av_codec_iterate(&opaque)))
+    {
+        if (av_codec_is_decoder(decoder) && decoder->id == AV_CODEC_ID_AV1)
+            std::cout << "Available AV1 decoder: " << decoder->name << std::endl;
+    }
 
     // Create decoder context
     decoderContext = avcodec_alloc_context3(decoder);
     avcodec_parameters_to_context(decoderContext, stream->codecpar); // Copy codec parameters into codec context
 
     // Open decoder
-    if (avcodec_open2(decoderContext, decoder, nullptr) < 0)
+    int result = avcodec_open2(decoderContext, decoder, nullptr);
+    if (result < 0)
     {
+        char errorBuffer[AV_ERROR_MAX_STRING_SIZE];
+        av_strerror(result, errorBuffer, sizeof(errorBuffer));
+
+        std::cerr << "Decoder initialization failed: " << errorBuffer << std::endl;
+
         invalid = true;
-        errorHandler.showError("Cannot open video-stream decoder", false);
+        errorHandler.showError(std::format("Cannot open video-stream decoder:\n{}", errorBuffer), false);
         return;
     }
 }
@@ -61,6 +83,8 @@ void StreamVideo::loadDecoder()
 #pragma region ENCODER
 void StreamVideo::loadEncoder()
 {
+    if (invalid) return;
+
     // Find the encoder context
     encoder = avcodec_find_encoder(AVCodecID::AV_CODEC_ID_PNG);
 
@@ -87,6 +111,8 @@ void StreamVideo::loadEncoder()
 #pragma region FILTER
 bool StreamVideo::loadFilter()
 {
+    if (invalid) return false;
+
 	const AVFilter* bufferSrc = avfilter_get_by_name("buffer"); // Get the filter where the frame will be sent to
 	const AVFilter* bufferSink = avfilter_get_by_name("buffersink"); // Get the filter where the frame will be received from
 
@@ -133,6 +159,8 @@ bool StreamVideo::loadFilter()
 #pragma region SWS CONTEXT
 void StreamVideo::loadSwsContext()
 {
+    if (invalid) return;
+
     // Create the context to convert the frame into a RGB frame
     swsContext = sws_getContext
     (
@@ -155,6 +183,8 @@ void StreamVideo::loadSwsContext()
 #pragma region EXPORT FRAME
 void StreamVideo::createExportFrame()
 {
+    if (invalid) return;
+
     // Create the RGB frame
     exportFrame = av_frame_alloc();
 
@@ -213,14 +243,21 @@ void StreamVideo::loadFrame()
 
 bool StreamVideo::writeFrame(AVFormatContext*& formatContext)
 {
+    if (invalid) return false;
+
     // Get the audio stream
     if (sendPacket->stream_index == streamIndex)
     {
         // Send compressed packet to decoder
-        if (avcodec_send_packet(decoderContext, sendPacket) < 0)
+        if (int result = avcodec_send_packet(decoderContext, sendPacket) < 0)
         {
             invalid = true;
-            errorHandler.showError("Cannot send packet to decoder in Video Stream", false);
+
+            char errorBuffer[AV_ERROR_MAX_STRING_SIZE];
+            av_strerror(result, errorBuffer, sizeof(errorBuffer));
+
+            errorHandler.showError(std::format("Video Stream - Decoder error: {}", errorBuffer), false);
+            std::cerr << "Video Stream - Decoder error: " << errorBuffer << std::endl;
             return false;
         }
 

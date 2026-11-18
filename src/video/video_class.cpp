@@ -25,6 +25,7 @@ void VideoClass::loadAssets()
 	{
 		for (auto& video : stuff.videoStreamMap)
 		{
+			std::lock_guard<std::mutex> lock(mutex);
 			// Stop the loading if requested
 			if (stopToken.stop_requested())
 			{
@@ -76,6 +77,7 @@ void VideoClass::loadStreams()
 			loadingHandler->loadingWeightRatio += stream->getLoadingWeight();
 
 			// Insert the stream in the map
+			std::lock_guard<std::mutex> lock(mutex);
 			stuff.videoStreamMap.insert(std::make_pair(type, std::move(stream)));
 		}
 	}
@@ -238,12 +240,16 @@ void VideoClass::update()
 	}
 
 	// Erase all the invalid streams that got an error
-	for (auto video = stuff.videoStreamMap.begin(); video != stuff.videoStreamMap.end();)
 	{
-		if (video->second->isInvalid())
-			video = stuff.videoStreamMap.erase(video);
-		else
-			video++;
+		std::lock_guard<std::mutex> lock(mutex);
+		for (auto video = stuff.videoStreamMap.begin(); video != stuff.videoStreamMap.end();)
+		{
+			if (video->second->isInvalid())
+				video = stuff.videoStreamMap.erase(video);
+			else
+				video++;
+		}
 	}
+	
 }
 #pragma endregion
