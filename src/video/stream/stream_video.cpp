@@ -70,13 +70,14 @@ void StreamVideo::loadEncoder()
     // Calculate the FPS
     double fps = av_q2d(stream->avg_frame_rate);
 	uint8_t roundedFps = static_cast<uint8_t>(std::round(fps));
-	uint8_t finalFps = std::min(roundedFps, settings.fps); // Use the minimum between the rounded FPS and the user-defined FPS
+    uint8_t finalFps = std::min(roundedFps, settings.fps); // Use the minimum between the rounded FPS and the user-defined FPS
+    settings.fps = std::max(finalFps, uint8_t(1U));
 
     // Get the settings
     encoderContext->width = settings.width;
     encoderContext->height = settings.height;
     encoderContext->pix_fmt = AV_PIX_FMT_RGB24;
-    encoderContext->time_base = { 1, finalFps };
+    encoderContext->time_base = { 1, settings.fps };
 
     // Open encoder
     avcodec_open2(encoderContext, encoder, nullptr);
@@ -86,9 +87,10 @@ void StreamVideo::loadEncoder()
 #pragma region FILTER
 bool StreamVideo::loadFilter()
 {
-    const AVFilter* bufferSrc = avfilter_get_by_name("buffer");
-    const AVFilter* bufferSink = avfilter_get_by_name("buffersink");
+	const AVFilter* bufferSrc = avfilter_get_by_name("buffer"); // Get the filter where the frame will be sent to
+	const AVFilter* bufferSink = avfilter_get_by_name("buffersink"); // Get the filter where the frame will be received from
 
+	// Create the filter graph
     filterData.filterGraph = avfilter_graph_alloc();
     if (filterData.filterGraph == nullptr)
         return false;
@@ -96,19 +98,32 @@ bool StreamVideo::loadFilter()
     const AVRational timeBase = stream->time_base;
     const AVRational sampleAspectRatio = decoderContext->sample_aspect_ratio;
 
+	// Define the arguments for the buffer source filter
     char args[512];
     snprintf(args, sizeof(args), "video_size=%dx%d:pix_fmt=%d:time_base=%d/%d:pixel_aspect=%d/%d", decoderContext->width, decoderContext->height, decoderContext->pix_fmt, timeBase.num, timeBase.den, sampleAspectRatio.num, sampleAspectRatio.den);
 
+	// Create the instances of the buffer source and buffer sink filters
     avfilter_graph_create_filter(&filterData.bufferSrcContext, bufferSrc, "in", args, nullptr, filterData.filterGraph);
     avfilter_graph_create_filter(&filterData.bufferSinkContext, bufferSink, "out", nullptr, nullptr, filterData.filterGraph);
 
+	// Create the FPS filter to limit the frame rate
     AVFilterContext* fpsFilter = nullptr;
-    avfilter_graph_create_filter(&fpsFilter, avfilter_get_by_name("fps"), "fps", "fps=60", nullptr, filterData.filterGraph);
+    std::string fpsArgs = std::format("fps={}", settings.fps);
+    avfilter_graph_create_filter(&fpsFilter, avfilter_get_by_name("fps"), "fps", fpsArgs.c_str(), nullptr, filterData.filterGraph);
 
+	// Link the filters together
     avfilter_link(filterData.bufferSrcContext, 0, fpsFilter, 0);
     avfilter_link(fpsFilter, 0, filterData.bufferSinkContext, 0);
 
-    avfilter_graph_config(filterData.filterGraph, nullptr);
+	// Configure the filter graph
+    if (avfilter_graph_config(filterData.filterGraph, nullptr) < 0)
+    {
+        invalid = true;
+        errorHandler.showError("Cannot configure the filter graph", false);
+        return false;
+    }
+
+	std::cout << std::format("FPS: {}", settings.fps) << std::endl;
 
     return true;
 }
@@ -217,6 +232,15 @@ bool StreamVideo::writeFrame(AVFormatContext*& formatContext)
             if (result == AVERROR(EAGAIN) || result == AVERROR_EOF)
                 return true;
 
+			// Check if the frame has been sent to the filter graph
+            if (result < 0)
+            {
+                invalid = true;
+                errorHandler.showError("Cannot send frame to filter graph", false);
+                return false;
+            }
+
+			// Get the filtered frame from the filter graph
             while (av_buffersink_get_frame(filterData.bufferSinkContext, filteredFrame) >= 0)
             {
                 // Create the audio file
@@ -246,7 +270,7 @@ void StreamVideo::receiveFrame(AVFormatContext*& formatContext)
     avcodec_flush_buffers(decoderContext); // Wipe the last buffers before reading another sample
 
     // Decode frames
-    while (av_read_frame(formatContext, sendPacket) >= 0 && !videoLifetime.isDone)
+    while (av_read_frame(formatContext, sendPacket) >= 0 && !videoLifetime.isDone && !invalid)
     {
         if (!writeFrame(formatContext) || frameIndex >= 10)
             break;
@@ -306,7 +330,6 @@ void StreamVideo::saveAsFile()
 
     // Wipe the packet to reusing it
     av_packet_unref(receivePacket);
-
     frameIndex++;
 }
 #pragma endregion

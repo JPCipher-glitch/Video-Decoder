@@ -24,7 +24,7 @@ struct PacketLoad : public IPacket
 	// Video settings
 	uint16_t width = 1920U;
 	uint16_t height = 1080U;
-	uint8_t fps = 5U;
+	uint8_t fps = 60U;
 
 	// Audio settings
 	uint32_t audioSampleRate = 44100U;

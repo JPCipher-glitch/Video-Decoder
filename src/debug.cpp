@@ -46,6 +46,31 @@ Debug::Debug(Lifetime& lifetime, ErrorHandler& errorHandler) : lifetime(lifetime
             stream >> std::quoted(packet->frameFormat);
             packet->frameFormat = packet->frameFormat.empty() || packet->frameFormat.front() != '.' ? ".jpg" : packet->frameFormat;
         });
+
+    commandMap.emplace("--width", [this](std::stringstream& stream, IPacket* p)
+        {
+            PacketLoad* packet = dynamic_cast<PacketLoad*>(p);
+			unsigned int width;
+
+            stream >> width;
+            packet->width = static_cast<uint16_t>(width);
+        });
+    commandMap.emplace("--height", [this](std::stringstream& stream, IPacket* p)
+        {
+            PacketLoad* packet = dynamic_cast<PacketLoad*>(p);
+			unsigned int height;
+
+            stream >> height;
+            packet->height = static_cast<uint16_t>(height);
+        });
+    commandMap.emplace("--fps", [this](std::stringstream& stream, IPacket* p)
+        {
+            PacketLoad* packet = dynamic_cast<PacketLoad*>(p);
+			unsigned int fps;
+
+            stream >> fps;
+            packet->fps = static_cast<uint8_t>(fps);
+        });
 }
 #pragma endregion
 
