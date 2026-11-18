@@ -42,7 +42,7 @@ StreamVideo::~StreamVideo()
 void StreamVideo::loadDecoder()
 {
     // Find a registered decoder
-    decoder = avcodec_find_decoder(stream->codecpar->codec_id);
+    decoder = avcodec_find_decoder_by_name("libdav1d");
 
     // Create decoder context
     decoderContext = avcodec_alloc_context3(decoder);
@@ -52,7 +52,7 @@ void StreamVideo::loadDecoder()
     if (avcodec_open2(decoderContext, decoder, nullptr) < 0)
     {
         invalid = true;
-        errorHandler.showError("Cannot open video decoder", false);
+        errorHandler.showError("Cannot open video-stream decoder", false);
         return;
     }
 }
@@ -217,11 +217,17 @@ bool StreamVideo::writeFrame(AVFormatContext*& formatContext)
     if (sendPacket->stream_index == streamIndex)
     {
         // Send compressed packet to decoder
-        avcodec_send_packet(decoderContext, sendPacket);
+        if (avcodec_send_packet(decoderContext, sendPacket) < 0)
+        {
+            invalid = true;
+            errorHandler.showError("Cannot send packet to decoder in Video Stream", false);
+            return false;
+        }
 
         // Receive decoded frames
         while (!videoLifetime.isDone)
         {
+            int a;
             // Receive the decoded data frame
             int result = avcodec_receive_frame(decoderContext, frame);
             if (result == AVERROR(EAGAIN) || result == AVERROR_EOF)
@@ -236,7 +242,7 @@ bool StreamVideo::writeFrame(AVFormatContext*& formatContext)
             if (result < 0)
             {
                 invalid = true;
-                errorHandler.showError("Cannot send frame to filter graph", false);
+                errorHandler.showError("Cannot send frame to filter graph in Video Stream", false);
                 return false;
             }
 
