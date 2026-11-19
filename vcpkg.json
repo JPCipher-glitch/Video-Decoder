@@ -5,6 +5,7 @@
       "features": [
         "avcodec",
         "avformat",
+        "dav1d",
         "swscale",
         "swresample",
         "zlib"

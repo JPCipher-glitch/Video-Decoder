@@ -48,17 +48,9 @@ void StreamVideo::loadDecoder()
 
     // Find a registered decoder
     if (stream->codecpar->codec_id == AV_CODEC_ID_AV1)
-        decoder = avcodec_find_decoder_by_name("av1");
+		decoder = avcodec_find_decoder_by_name("libdav1d"); // Use libdav1d decoder for AV1 files
     else
         decoder = avcodec_find_decoder(stream->codecpar->codec_id);
-
-    void* opaque = nullptr;
-
-    while ((decoder = av_codec_iterate(&opaque)))
-    {
-        if (av_codec_is_decoder(decoder) && decoder->id == AV_CODEC_ID_AV1)
-            std::cout << "Available AV1 decoder: " << decoder->name << std::endl;
-    }
 
     // Create decoder context
     decoderContext = avcodec_alloc_context3(decoder);
