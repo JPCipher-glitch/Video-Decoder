@@ -3,7 +3,12 @@
 
 #include <asio.hpp>
 
-constexpr unsigned short SERVER_PORT = 9666;
+// Server port used according to the type of instance executing
+#ifdef _DEBUG
+constexpr unsigned short SERVER_PORT = 6464;
+#else
+constexpr unsigned short SERVER_PORT = 6767;
+#endif
 
 // ASIO Common Aliases
 using IoContext = asio::io_context;

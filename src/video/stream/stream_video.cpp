@@ -55,6 +55,7 @@ void StreamVideo::loadDecoder()
     // Create decoder context
     decoderContext = avcodec_alloc_context3(decoder);
     avcodec_parameters_to_context(decoderContext, stream->codecpar); // Copy codec parameters into codec context
+    decoderContext->pkt_timebase = stream->time_base;
 
     // Open decoder
     int result = avcodec_open2(decoderContext, decoder, nullptr);
@@ -241,7 +242,8 @@ bool StreamVideo::writeFrame(AVFormatContext*& formatContext)
     if (sendPacket->stream_index == streamIndex)
     {
         // Send compressed packet to decoder
-        if (int result = avcodec_send_packet(decoderContext, sendPacket) < 0)
+        int result = avcodec_send_packet(decoderContext, sendPacket);
+        if (result < 0)
         {
             invalid = true;
 
@@ -261,6 +263,10 @@ bool StreamVideo::writeFrame(AVFormatContext*& formatContext)
             int result = avcodec_receive_frame(decoderContext, frame);
             if (result == AVERROR(EAGAIN) || result == AVERROR_EOF)
                 return true;
+
+            // Convert the PTS into a timestamp estimation calculated with FFMPEG
+            if (frame->pts == AV_NOPTS_VALUE && frame->best_effort_timestamp != AV_NOPTS_VALUE)
+                frame->pts = frame->best_effort_timestamp;
 
 			// Send the frame to the filter graph
             result = av_buffersrc_add_frame_flags(filterData.bufferSrcContext, frame, AV_BUFFERSRC_FLAG_KEEP_REF);
@@ -313,9 +319,19 @@ void StreamVideo::receiveFrame(AVFormatContext*& formatContext)
 
 	// Flush the decoder
     avcodec_send_packet(decoderContext, nullptr);
+    while (avcodec_receive_frame(decoderContext, frame) >= 0)
+    {
+        av_buffersrc_add_frame_flags(
+            filterData.bufferSrcContext,
+            frame,
+            AV_BUFFERSRC_FLAG_KEEP_REF
+        );
+
+        av_frame_unref(frame);
+    }
+
 	// Flush the filter decoder
     av_buffersrc_add_frame_flags(filterData.bufferSrcContext, nullptr, 0);
-
 	// Get the lost frames from the filter graph
     while (av_buffersink_get_frame(filterData.bufferSinkContext, filteredFrame) >= 0)
     {

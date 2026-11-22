@@ -44,7 +44,14 @@
 
 # Packages
     find_package(FFMPEG REQUIRED)
-    find_package(Qt6 REQUIRED COMPONENTS Core Widgets Gui Network)
+    find_package(Boost REQUIRED COMPONENTS interprocess)
+    find_package(Qt6 REQUIRED COMPONENTS Core Widgets Gui)
+
+    if(TARGET PkgConfig::dav1d)
+        message(STATUS "dav1d target found!")
+    else()
+        message(STATUS "dav1d target NOT found!")
+    endif()
 
 # QT Setup
     qt_standard_project_setup()
@@ -64,6 +71,11 @@
 # Executable
     qt_add_executable(${PROJECT_NAME} src/main.cpp ${CMAKE_SOURCE_DIR}/_resources/res.qrc)
 
+# Remove the Console from the Program
+    if(WIN32)
+        set_target_properties(${PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE "$<NOT:$<CONFIG:Debug>>")
+    endif()
+
 # Configuration into the last version of the C++
     target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_23)
 
@@ -82,7 +94,8 @@
 
 # Include the FFMPEG, Winsock, Asio libs
     target_link_libraries(${PROJECT_NAME} PRIVATE ${FFMPEG_LIBRARIES})
-    target_link_libraries(${PROJECT_NAME} PRIVATE Qt6::Core Qt6::Widgets Qt6::Gui Qt6::Network)
+    target_link_libraries(${PROJECT_NAME} PRIVATE Boost::interprocess)
+    target_link_libraries(${PROJECT_NAME} PRIVATE Qt6::Core Qt6::Widgets Qt6::Gui)
     target_link_libraries(${PROJECT_NAME} PUBLIC asio::asio)
 
 # Deploy Qt for Windows
