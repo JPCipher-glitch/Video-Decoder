@@ -1,4 +1,4 @@
-﻿#include "command.hpp"
+﻿#include "server/server_command.hpp"
 #include "video/video_packets.hpp"
 #include "serializer/serializer.hpp"
 

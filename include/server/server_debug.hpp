@@ -1,5 +1,5 @@
-#ifndef DEBUG_HPP
-#define DEBUG_HPP
+#ifndef SERVER_DEBUG_HPP
+#define SERVER_DEBUG_HPP
 
 #include "asio_utils.hpp"
 #include "serializer/protocol.hpp"

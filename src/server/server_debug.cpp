@@ -1,4 +1,4 @@
-﻿#include "debug.hpp"
+﻿#include "server/server_debug.hpp"
 
 #include "video/video_packets.hpp"
 #include "serializer/serializer.hpp"

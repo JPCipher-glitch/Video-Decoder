@@ -1,5 +1,7 @@
-#ifndef COMMAND_HPP
-#define COMMAND_HPP
+#ifndef SERVER_COMMAND_HPP
+#define SERVER_COMMAND_HPP
+
+#include "server/server_client.hpp"
 
 #include "asio_utils.hpp"
 #include "serializer/protocol.hpp"
@@ -16,20 +18,7 @@
 using byte = uint8_t;
 using byte_stream = std::vector<uint8_t>;
 
-class Command;
-
-struct ClientStuff : public std::enable_shared_from_this<ClientStuff>
-{
-	TcpSocket socket;
-	std::array<uint8_t, 1024> buffer;
-	std::atomic_bool toRemove{ false };
-
-	ClientStuff(TcpSocket&& socket);
-	void read(std::weak_ptr<Command> command);
-};
-
 class Serializer;
-
 class Command : public IProtocol, public std::enable_shared_from_this<Command>
 {
 private:

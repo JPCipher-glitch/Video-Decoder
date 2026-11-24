@@ -2,9 +2,9 @@
 #define ENGINE_HPP
 
 #include "video/video_manager.hpp"
-#include "command.hpp"
+#include "server/server_command.hpp"
+#include "server/server_debug.hpp"
 #include "lifetime.hpp"
-#include "debug.hpp"
 #include "error_handler.hpp"
 
 #include <filesystem>
